@@ -7,6 +7,7 @@ from tensorboardX import SummaryWriter
 import model.minkunet as Minkowski
 from data.S3DIS import S3DISDataset
 from model.evaluator import Evaluator
+import MinkowskiEngine as ME
 
 
 class Trainer(object):
@@ -17,11 +18,10 @@ class Trainer(object):
         self.batch_size = self.config["batch_size"]
         self.model = Minkowski.MinkUNet34C(3, self.config["class"])
         if self.config["fine_tune"]:
-            model_dict = torch.load('/home/gaoqiyu/PycharmProjects/MinkowskiEngine/resume/weights_14.pth')
+            model_dict = torch.load(os.path.join(config["resume_path"], 'weights_14.pth'))
             self.model.load_state_dict(model_dict)
         if self.config["use_cuda"]:
             self.model = self.model.cuda(self.device)
-
         self.optimizer = torch.optim.SGD(self.model.parameters(), lr=self.config["lr"], momentum=self.config["momentum"],
                                          weight_decay=1e-4)
         self.lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer)
@@ -62,8 +62,6 @@ class Trainer(object):
             epoch_loss += loss.item()
             self.summary.add_scalar('train/loss: ', loss.item(), epoch_ * len(self.train_data) + ith)
             print("train epoch:  {}/{}, ith:  {}/{}, loss:  {}".format(epoch_, self.config['epoch'], ith, len(self.train_data), loss.item()))
-
-            loss.zero_()
         average_loss = epoch_loss/len(self.train_data)
         self.summary.add_scalar('train/loss_epoch: ', average_loss, epoch_)
         print("epoch:    {}/{}, average_loss:    {}".format(epoch_, self.config['epoch'], average_loss))
@@ -84,7 +82,7 @@ class Trainer(object):
             self.summary.add_scalar('val/mIOU', mIOU, epoch_*len(self.val_data)+ith)
             print("val epoch:  {}/{}, ith:  {}/{}, mIOU:  {}%".format(epoch_, self.config['epoch'], ith, len(self.val_data), mIOU*100))
         average_mIOU = mIOU_epoch/len(self.val_data)
-        self.summary.add_scalar('val/mIOU', average_mIOU, epoch_)
+        self.summary.add_scalar('val/mIOU_epoch', average_mIOU, epoch_)
         print("epoch:    {}/{}, average_mIOU:    {}%".format(epoch_, self.config['epoch'], average_mIOU*100))
         print('------------------------------------------------------------------')
         if average_mIOU < self.best_pred:
