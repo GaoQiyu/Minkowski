@@ -60,7 +60,7 @@ class Trainer(object):
             self.optimizer.zero_grad()
 
             epoch_loss += loss.item()
-            self.summary.add_scalar('train/loss: ', loss.item(), ith)
+            self.summary.add_scalar('train/loss: ', loss.item(), epoch_ * len(self.train_data) + ith)
             print("train epoch:  {}/{}, ith:  {}/{}, loss:  {}".format(epoch_, self.config['epoch'], ith, len(self.train_data), loss.item()))
 
             loss.zero_()
@@ -81,7 +81,7 @@ class Trainer(object):
             pred = output.F.max(1)[1]
             IOU, mIOU = self.evaluator.mIOU(pred.cpu().double(), label)
             mIOU_epoch += mIOU
-            self.summary.add_scalar('val/mIOU', mIOU, ith)
+            self.summary.add_scalar('val/mIOU', mIOU, epoch_*len(self.val_data)+ith)
             print("val epoch:  {}/{}, ith:  {}/{}, mIOU:  {}%".format(epoch_, self.config['epoch'], ith, len(self.val_data), mIOU*100))
         average_mIOU = mIOU_epoch/len(self.val_data)
         self.summary.add_scalar('val/mIOU', average_mIOU, epoch_)

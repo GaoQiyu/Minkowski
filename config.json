@@ -1,5 +1,5 @@
 {
-  "fine_tune": true,
+  "fine_tune": false,
   "use_cuda": true,
   "use_multiple_fold": false,
   "class": 14,
@@ -12,6 +12,6 @@
   "points_num": 30000,
 
   "data_path": "/home/gaoqiyu/文档/Stanford3dDataset_v1.2_Aligned_Version/split",
-  "log_path": "/home/gaoqiyu/PycharmProjects/MinkowskiEngine/log",
-  "resume_path": "/home/gaoqiyu/PycharmProjects/MinkowskiEngine/resume"
+  "log_path": "/home/gaoqiyu/PycharmProjects/PointCloudSeg_Minkowski/log",
+  "resume_path": "/home/gaoqiyu/PycharmProjects/PointCloudSeg_Minkowski/resume"
 }
