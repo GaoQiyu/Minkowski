@@ -1,0 +1,17 @@
+{
+  "fine_tune": true,
+  "use_cuda": true,
+  "use_multiple_fold": false,
+  "class": 14,
+
+  "lr": 0.1,
+  "momentum": 0.9,
+  "batch_size": 12,
+  "epoch": 50,
+  "voxel_size": 0.1,
+  "points_num": 30000,
+
+  "data_path": "/home/gaoqiyu/文档/Stanford3dDataset_v1.2_Aligned_Version/split",
+  "log_path": "/home/gaoqiyu/PycharmProjects/MinkowskiEngine/log",
+  "resume_path": "/home/gaoqiyu/PycharmProjects/MinkowskiEngine/resume"
+}
