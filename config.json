@@ -1,17 +1,17 @@
 {
   "fine_tune": false,
   "use_cuda": true,
-  "use_multiple_fold": false,
+  "multiple_fold": true,
   "class": 14,
 
   "lr": 0.1,
   "momentum": 0.9,
   "batch_size": 12,
-  "epoch": 50,
-  "voxel_size": 0.1,
-  "points_num": 30000,
+  "epoch": 100,
+  "voxel_size": 0.05,
+  "point_num": 30000,
 
   "data_path": "/home/gaoqiyu/文档/Stanford3dDataset_v1.2_Aligned_Version/split",
-  "log_path": "/home/gaoqiyu/PycharmProjects/PointCloudSeg_Minkowski/log",
-  "resume_path": "/home/gaoqiyu/PycharmProjects/PointCloudSeg_Minkowski/resume"
+  "log_path": "/media/gaoqiyu/File/Pycharm/PointCloudSeg_Minkowski/log",
+  "resume_path": "/media/gaoqiyu/File/Pycharm/PointCloudSeg_Minkowski/resume"
 }
