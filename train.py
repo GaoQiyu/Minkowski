@@ -7,13 +7,15 @@ from tensorboardX import SummaryWriter
 import model.minkunet as Minkowski
 from data.S3DIS import S3DISDataset
 from model.evaluator import Evaluator
-import MinkowskiEngine as ME
 
 
 class Trainer(object):
     def __init__(self, config_):
         self.config = config_
         self.best_pred = math.inf
+        self.train_iter_number = 0
+        self.val_iter_number = 0
+        self.epoch = 0
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.batch_size = self.config["batch_size"]
         self.model = Minkowski.MinkUNet34C(3, self.config["class"])
@@ -33,8 +35,6 @@ class Trainer(object):
 
         self.train_data = S3DISDataset(self.config["data_path"], voxel_size=self.config["voxel_size"])
         self.val_data = S3DISDataset(self.config["data_path"], data_type='val', voxel_size=config["voxel_size"])
-        # self.train_data_loader = DataLoader(train_data, self.config["batch_size"], shuffle=True)
-        # self.val_data_loader = DataLoader(val_data, self.config["batch_size"])
 
         log_path = os.path.join(config["log_path"], str(time.time()))
         os.mkdir(log_path) if not os.path.exists(log_path) else None
@@ -47,8 +47,6 @@ class Trainer(object):
         epoch_loss = 0
         self.model.train()
         for ith, samples in enumerate(self.train_data):
-            # coords, feats, label = samples
-            # point = ME.SparseTensor(feats, coords, batch=True)
             point = samples[0].to(self.device) if self.config["use_cuda"] else samples[0].cpu()
             label = samples[1].long()
 
@@ -61,7 +59,9 @@ class Trainer(object):
             self.optimizer.zero_grad()
 
             epoch_loss += loss.item()
-            self.summary.add_scalar('train/loss: ', loss.item(), epoch_ * len(self.train_data) + ith)
+
+            self.train_iter_number += 1
+            self.summary.add_scalar('train/loss: ', loss.item(), self.train_iter_number)
             print("train epoch:  {}/{}, ith:  {}/{}, loss:  {}".format(epoch_, self.config['epoch'], ith, len(self.train_data), loss.item()))
         average_loss = epoch_loss/len(self.train_data)
         self.summary.add_scalar('train/loss_epoch: ', average_loss, epoch_)
@@ -79,7 +79,9 @@ class Trainer(object):
             pred = output.F.max(1)[1]
             IOU, mIOU = self.evaluator.mIOU(pred.cpu(), label)
             mIOU_epoch += mIOU
-            self.summary.add_scalar('val/mIOU', mIOU, epoch_*len(self.val_data)+ith)
+
+            self.val_iter_number += 1
+            self.summary.add_scalar('val/mIOU', mIOU, self.val_iter_number)
             print("val epoch:  {}/{}, ith:  {}/{}, mIOU:  {}%".format(epoch_, self.config['epoch'], ith, len(self.val_data), mIOU*100))
         average_mIOU = mIOU_epoch/len(self.val_data)
         self.summary.add_scalar('val/mIOU_epoch', average_mIOU, epoch_)
@@ -95,6 +97,9 @@ class Trainer(object):
             self.lr_scheduler.load_state_dict(load_parameters['lr_scheduler'])
             self.model.load_state_dict(load_parameters['model'])
             self.best_pred = load_parameters['best_prediction']
+            self.epoch = load_parameters['epoch']
+            self.train_iter_number = load_parameters['train_iter_number']
+            self.val_iter_number = load_parameters['val_iter_number']
             self.model = self.model.cuda()
 
     def save(self, epoch_):
@@ -103,7 +108,9 @@ class Trainer(object):
                     'model': self.model.state_dict(),
                     'optimizer': self.optimizer.state_dict(),
                     'lr_scheduler': self.lr_scheduler.state_dict(),
-                    'epoch': epoch_},
+                    'epoch': epoch_,
+                    'train_iter_number': self.train_iter_number,
+                    'val_iter_number': self.val_iter_number},
                    os.path.join(self.config["resume_path"], 'parameters.pth'))
 
 
@@ -114,11 +121,10 @@ if __name__ == '__main__':
     config_file.close()
 
     trainer = Trainer(config)
-    for epoch in range(config["epoch"]):
-        if config["multiple_fold"] and (epoch == math.floor(config["epoch"]/3) or epoch == math.floor(config["epoch"]*2/3)):
-            for fold_inds in range(1, 3):
-                trainer.train_data = S3DISDataset(config["data_path"], fold=fold_inds,  voxel_size=config["voxel_size"])
-                trainer.val_data = S3DISDataset(config["data_path"], fold=fold_inds, data_type='val', voxel_size=config["voxel_size"])
-        # trainer.train(epoch)
+    for epoch in range(trainer.epoch, config["epoch"]):
+        if config["multiple_fold"]:
+            trainer.train_data = S3DISDataset(config["data_path"], fold=epoch%3,  voxel_size=config["voxel_size"])
+            trainer.val_data = S3DISDataset(config["data_path"], fold=epoch%3, data_type='val', voxel_size=config["voxel_size"])
+        trainer.train(epoch)
         trainer.eval(epoch)
         trainer.summary.close()

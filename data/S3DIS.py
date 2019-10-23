@@ -35,17 +35,7 @@ class S3DISDataset(Dataset):
         coordinates_, featrues_, label = tuple([coords[inds]]), tuple([feats[inds]]), label[inds]
         coordinates, features = ME.utils.sparse_collate(coordinates_, featrues_)
 
-        # discrete_coords, unique_feats, unique_labels = ME.utils.sparse_quantize(
-        #     coords=coords,
-        #     feats=feats,
-        #     labels=label,
-        #     hash_type='ravel',
-        #     set_ignore_label_when_collision=False,
-        #     quantization_size=self.voxel_size)
-        # shuffle_index = np.random.choice(discrete_coords.shape[0], self.points_num)
-
         return [ME.SparseTensor(features, coords=coordinates), torch.from_numpy(label)]
-        # return [discrete_coords[shuffle_index], unique_feats[shuffle_index], unique_labels[shuffle_index]]
 
     def __len__(self):
         return self.length

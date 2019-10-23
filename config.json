@@ -12,6 +12,6 @@
   "point_num": 30000,
 
   "data_path": "/home/gaoqiyu/文档/Stanford3dDataset_v1.2_Aligned_Version/split",
-  "log_path": "/media/gaoqiyu/File/Pycharm/PointCloudSeg_Minkowski/log",
-  "resume_path": "/media/gaoqiyu/File/Pycharm/PointCloudSeg_Minkowski/resume"
+  "log_path": "/home/gaoqiyu/PycharmProjects/PointCloudSeg_Minkowski/log",
+  "resume_path": "/home/gaoqiyu/PycharmProjects/PointCloudSeg_Minkowski/resume"
 }

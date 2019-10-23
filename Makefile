@@ -7,7 +7,7 @@ Q ?= @
 # Uncomment for CPU only build. Also uncomment the line 66 setup.py.
 # CPU_ONLY := 1
 
-CXX := g++
+CXX := /usr/bin/g++-7
 
 EXTENSION_NAME := minkowski
 
