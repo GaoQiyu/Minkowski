@@ -5,8 +5,9 @@ import math
 import time
 from tensorboardX import SummaryWriter
 import model.minkunet as Minkowski
-from data.S3DIS import S3DISDataset
+from data import dataloader
 from model.evaluator import Evaluator
+import MinkowskiEngine as ME
 
 
 class Trainer(object):
@@ -33,8 +34,8 @@ class Trainer(object):
         self.lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer)
         self.loss = torch.nn.CrossEntropyLoss()
 
-        self.train_data = S3DISDataset(self.config["data_path"], voxel_size=self.config["voxel_size"])
-        self.val_data = S3DISDataset(self.config["data_path"], data_type='val', voxel_size=config["voxel_size"])
+        self.train_data = dataloader(self.config["batch_size"], self.config["data_path"], voxel_size=self.config["voxel_size"], transform=True, shuffle=True)
+        self.val_data = dataloader(self.config["batch_size"], self.config["data_path"], data_type='val', voxel_size=config["voxel_size"])
 
         log_path = os.path.join(config["log_path"], str(time.time()))
         os.mkdir(log_path) if not os.path.exists(log_path) else None
@@ -46,9 +47,11 @@ class Trainer(object):
     def train(self, epoch_):
         epoch_loss = 0
         self.model.train()
-        for ith, samples in enumerate(self.train_data):
-            point = samples[0].to(self.device) if self.config["use_cuda"] else samples[0].cpu()
-            label = samples[1].long()
+        for ith, data_dict in enumerate(self.train_data):
+            point = ME.SparseTensor(data_dict['feats'], data_dict['coords'].int())
+            if self.config["use_cuda"]:
+                point.to(self.device)
+            label = data_dict['labels']
 
             output_sparse = self.model(point)
             pred = output_sparse.F
@@ -71,9 +74,12 @@ class Trainer(object):
     def eval(self, epoch_):
         self.model.eval()
         mIOU_epoch = 0
-        for ith, samples in enumerate(self.val_data):
-            point = samples[0].to(self.device) if self.config["use_cuda"] else samples[0].cpu()
-            label = samples[1].long()
+        for ith, data_dict in enumerate(self.val_data):
+            point = ME.SparseTensor(data_dict['feats'], data_dict['coords'].int())
+            if self.config["use_cuda"]:
+                point.to(self.device)
+            label = data_dict['labels']
+
             with torch.no_grad():
                 output = self.model(point)
             pred = output.F.max(1)[1]
@@ -121,10 +127,14 @@ if __name__ == '__main__':
     config_file.close()
 
     trainer = Trainer(config)
+    time = time.time()
     for epoch in range(trainer.epoch, config["epoch"]):
         if config["multiple_fold"]:
-            trainer.train_data = S3DISDataset(config["data_path"], fold=epoch%3,  voxel_size=config["voxel_size"])
-            trainer.val_data = S3DISDataset(config["data_path"], fold=epoch%3, data_type='val', voxel_size=config["voxel_size"])
+            trainer.train_data = dataloader(config["batch_size"], config["data_path"], fold=epoch%3, voxel_size=config["voxel_size"], transform=True, shuffle=True)
+            trainer.val_data = dataloader(config["batch_size"], config["data_path"], fold=epoch%3, data_type='val', voxel_size=config["voxel_size"])
         trainer.train(epoch)
         trainer.eval(epoch)
+        print('one epoch time:   {} s'.format(time.time() - time))
+        trainer.summary.add_scalar('epoch_time', time.time() - time, epoch)
         trainer.summary.close()
+        time = time.time()

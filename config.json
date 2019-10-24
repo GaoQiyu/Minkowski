@@ -1,7 +1,7 @@
 {
   "fine_tune": false,
   "use_cuda": true,
-  "multiple_fold": true,
+  "multiple_fold": false,
   "class": 14,
 
   "lr": 0.1,
