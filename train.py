@@ -127,14 +127,15 @@ if __name__ == '__main__':
     config_file.close()
 
     trainer = Trainer(config)
-    time = time.time()
+    time_now = time.time()
     for epoch in range(trainer.epoch, config["epoch"]):
         if config["multiple_fold"]:
             trainer.train_data = dataloader(config["batch_size"], config["data_path"], fold=epoch%3, voxel_size=config["voxel_size"], transform=True, shuffle=True)
             trainer.val_data = dataloader(config["batch_size"], config["data_path"], fold=epoch%3, data_type='val', voxel_size=config["voxel_size"])
         trainer.train(epoch)
         trainer.eval(epoch)
-        print('one epoch time:   {} s'.format(time.time() - time))
-        trainer.summary.add_scalar('epoch_time', time.time() - time, epoch)
+        print('one epoch time:   {} s'.format(time.time() - time_now))
+        trainer.summary.add_scalar('epoch_time', time.time() - time_now, epoch)
         trainer.summary.close()
-        time = time.time()
+        time_now = time.time()
+
