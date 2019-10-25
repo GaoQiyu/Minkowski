@@ -83,6 +83,7 @@ def collate_fn(list_data):
     num_tot_pts = sum(lens)
     coords_batch = torch.zeros(num_tot_pts, 4)
     feats_batch = torch.from_numpy(np.vstack(feats)).float()
+    label_batch = torch.from_numpy(np.vstack(labels)).squeeze().long()
 
     for batch_id in range(eff_num_batch):
         coords_batch[curr_ptr:curr_ptr + lens[batch_id], :3] = torch.from_numpy(coords[batch_id])
@@ -93,7 +94,7 @@ def collate_fn(list_data):
     return {
         'coords': coords_batch,
         'feats': feats_batch,
-        'labels': labels,
+        'labels': label_batch,
     }
 
 

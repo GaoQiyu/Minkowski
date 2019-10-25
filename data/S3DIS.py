@@ -9,7 +9,7 @@ class S3DISDataset(Dataset):
     category = ['wall', 'floor', 'stairs', 'beam', 'chair', 'sofa', 'table',
                 'door', 'window', 'bookcase', 'column', 'clutter', 'ceiling', 'board']
 
-    def __init__(self, path, fold=0, data_type='train', voxel_size=0.05, transformations=None):
+    def __init__(self, path, fold=0, data_type='train', voxel_size=0.05, transformations=False):
         super(Dataset, self).__init__()
         self.transformations = transformations
         self.voxel_size = voxel_size
@@ -38,7 +38,7 @@ class S3DISDataset(Dataset):
         # coordinates, features = ME.utils.sparse_collate(coordinates, features)
 
         # return [ME.SparseTensor(features, coords=coordinates), torch.from_numpy(label)]
-        return (coordinates, features, torch.from_numpy(label).long())
+        return (coordinates, features, label.reshape(-1, 1))
 
     def __len__(self):
         return self.length

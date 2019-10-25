@@ -51,11 +51,11 @@ class Trainer(object):
             point = ME.SparseTensor(data_dict['feats'], data_dict['coords'].int())
             if self.config["use_cuda"]:
                 point.to(self.device)
-            label = data_dict['labels']
+            labels = data_dict['labels']
 
             output_sparse = self.model(point)
             pred = output_sparse.F
-            loss = self.loss(pred.cpu(), label)
+            loss = self.loss(pred.cpu(), labels)
             loss.backward()
             self.optimizer.step()
             self.lr_scheduler.step(epoch_)
