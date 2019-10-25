@@ -1,17 +1,17 @@
 import numpy as np
 from torch.utils.data import DataLoader
 from data.S3DIS import S3DISDataset
-# from torchvision.transforms import Compose as VisionCompose
+from torchvision.transforms import Compose as VisionCompose
 from scipy.linalg import expm, norm
 import torch
 
 
-# class Compose(VisionCompose):
-#
-#     def __call__(self, *args):
-#         for t in self.transforms:
-#             args = t(*args)
-#         return args
+class Compose(VisionCompose):
+
+    def __call__(self, *args):
+        for t in self.transforms:
+            args = t(*args)
+        return args
 
 
 class RandomRotation:
@@ -105,8 +105,8 @@ def dataloader(batch_size, path, fold=0, data_type='train', voxel_size=0.05, tra
         transformations.append(RandomTranslation())
         transformations.append(RandomScale(0.8, 1.2))
         transformations.append(RandomShear())
-    # data = S3DISDataset(path, fold, data_type, voxel_size, Compose(transformations))
-    data = S3DISDataset(path, fold, data_type, voxel_size)
+    data = S3DISDataset(path, fold, data_type, voxel_size, Compose(transformations))
+    # data = S3DISDataset(path, fold, data_type, voxel_size)
     dataloader = DataLoader(data, batch_size, shuffle, drop_last=drop_last, collate_fn=collate_fn)
     return dataloader
 

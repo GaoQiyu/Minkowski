@@ -17,13 +17,13 @@ class Trainer(object):
         self.train_iter_number = 0
         self.val_iter_number = 0
         self.epoch = 0
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.device = torch.device(0)
         self.batch_size = self.config["batch_size"]
         self.model = Minkowski.MinkUNet34C(3, self.config["class"])
         if self.config["fine_tune"]:
             model_dict = torch.load(os.path.join(config["resume_path"], 'weights_14.pth'))
             self.model.load_state_dict(model_dict)
-        self.model = self.model.cuda(self.device) if self.config["use_cuda"] else None
+        self.model = self.model.to(self.device) if self.config["use_cuda"] else None
 
         self.optimizer = torch.optim.SGD([
             {'params': self.model.convtr7p2s2.parameters(), 'lr': self.config["lr"] / 1e2},
@@ -106,7 +106,7 @@ class Trainer(object):
             self.epoch = load_parameters['epoch']
             self.train_iter_number = load_parameters['train_iter_number']
             self.val_iter_number = load_parameters['val_iter_number']
-            self.model = self.model.cuda()
+            self.model = self.model.to(self.device)
 
     def save(self, epoch_):
         os.mkdir(config["resume_path"]) if not os.path.exists(config["resume_path"]) else None
