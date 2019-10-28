@@ -21,9 +21,10 @@ class Trainer(object):
         self.batch_size = self.config["batch_size"]
         self.model = Minkowski.MinkUNet34C(3, self.config["class"])
         if self.config["fine_tune"]:
-            model_dict = torch.load(os.path.join(config["resume_path"], 'weights_14.pth'))
+            model_dict = torch.load(os.path.join(config["resume_path"], 'weights_14.pth'), map_location=lambda storage, loc: storage.cuda(self.device))
             self.model.load_state_dict(model_dict)
-        self.model = self.model.to(self.device) if self.config["use_cuda"] else None
+        if self.config["use_cuda"]:
+            self.model = self.model.to(self.device)
 
         self.optimizer = torch.optim.SGD([
             {'params': self.model.convtr7p2s2.parameters(), 'lr': self.config["lr"] / 1e2},
@@ -98,7 +99,7 @@ class Trainer(object):
     def load(self):
         load_path = os.path.join(self.config["resume_path"], 'parameters.pth')
         if os.path.isfile(load_path):
-            load_parameters = torch.load(load_path)
+            load_parameters = torch.load(load_path, map_location=lambda storage, loc: storage.cuda(self.device))
             self.optimizer.load_state_dict(load_parameters['optimizer'])
             self.lr_scheduler.load_state_dict(load_parameters['lr_scheduler'])
             self.model.load_state_dict(load_parameters['model'])

@@ -13,3 +13,12 @@ class Evaluator(object):
         IoU = np.diag(self.matrix) / (np.sum(self.matrix, axis=1) + np.sum(self.matrix, axis=0) - np.diag(self.matrix) + 1e-10)
         mIoU = np.nanmean(IoU)
         return IoU, mIoU
+
+
+if __name__ == '__main__':
+    eval = Evaluator(14)
+    pred = np.random.randint(14, size=(10000))
+    label = pred.copy()
+    Iou, mIoU = eval.mIOU(pred, label)
+    print(Iou)
+    print(mIoU)
