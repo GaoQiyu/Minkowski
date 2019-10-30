@@ -259,6 +259,7 @@ class MinkowskiConvolutionBase(MinkowskiModuleBase):
         # If the kernel_size == 1, the convolution is simply a matrix
         # multiplication
         if self.use_mm:
+            # todo eval change 6*256 kernal to fc
             outfeat = input.F.mm(self.kernel)
             out_coords_key = input.coords_key
         else:
