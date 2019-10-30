@@ -1,162 +1,228 @@
-# Copyright (c) Chris Choy (chrischoy@ai.stanford.edu).
-#
-# Permission is hereby granted, free of charge, to any person obtaining a copy of
-# this software and associated documentation files (the "Software"), to deal in
-# the Software without restriction, including without limitation the rights to
-# use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
-# of the Software, and to permit persons to whom the Software is furnished to do
-# so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
-#
-# Please cite "4D Spatio-Temporal ConvNets: Minkowski Convolutional Neural
-# Networks", CVPR'19 (https://arxiv.org/abs/1904.08755) if you use any part
-# of the code.
-import torch
 import torch.nn as nn
-from torch.optim import SGD
-
 import MinkowskiEngine as ME
-from MinkowskiEngine.modules.resnet_block import BasicBlock, Bottleneck
+from model.common import ConvType, NormType, get_norm, conv, sum_pool
+from model.resnet_block import BasicBlock, Bottleneck
+from MinkowskiEngine import MinkowskiNetwork
 
 
-class ResNetBase(nn.Module):
-    BLOCK = None
-    LAYERS = ()
-    INIT_DIM = 64
-    PLANES = (64, 128, 256, 512)
+class Model(MinkowskiNetwork):
+  """
+  Base network for all sparse convnet
 
-    def __init__(self, in_channels, out_channels, D=3):
-        nn.Module.__init__(self)
-        self.D = D
-        assert self.BLOCK is not None
+  By default, all networks are segmentation networks.
+  """
+  OUT_PIXEL_DIST = -1
 
-        self.network_initialization(in_channels, out_channels, D)
-        self.weight_initialization()
+  def __init__(self, in_channels, out_channels, D, **kwargs):
+    super(Model, self).__init__(D)
+    self.in_channels = in_channels
+    self.out_channels = out_channels
 
-    def network_initialization(self, in_channels, out_channels, D):
 
-        self.inplanes = self.INIT_DIM
-        self.conv1 = ME.MinkowskiConvolution(
-            in_channels, self.inplanes, kernel_size=5, stride=2, dimension=D)
+class ResNetBase(Model):
+  BLOCK = None
+  LAYERS = ()
+  INIT_DIM = 64
+  PLANES = (64, 128, 256, 512)
+  OUT_PIXEL_DIST = 32
+  HAS_LAST_BLOCK = False
+  CONV_TYPE = ConvType.HYPERCUBE
 
-        self.bn1 = ME.MinkowskiBatchNorm(self.inplanes)
-        self.relu = ME.MinkowskiReLU(inplace=True)
+  def __init__(self, in_channels, out_channels, D=3, **kwargs):
+    assert self.BLOCK is not None
+    assert self.OUT_PIXEL_DIST > 0
 
-        self.pool = ME.MinkowskiAvgPooling(kernel_size=2, stride=2, dimension=D)
+    super(ResNetBase, self).__init__(in_channels, out_channels, D, **kwargs)
 
-        self.layer1 = self._make_layer(
-            self.BLOCK, self.PLANES[0], self.LAYERS[0], stride=2)
-        self.layer2 = self._make_layer(
-            self.BLOCK, self.PLANES[1], self.LAYERS[1], stride=2)
-        self.layer3 = self._make_layer(
-            self.BLOCK, self.PLANES[2], self.LAYERS[2], stride=2)
-        self.layer4 = self._make_layer(
-            self.BLOCK, self.PLANES[3], self.LAYERS[3], stride=2)
+    self.network_initialization(in_channels, out_channels, D)
+    self.weight_initialization()
 
-        self.conv5 = ME.MinkowskiConvolution(
-            self.inplanes, self.inplanes, kernel_size=3, stride=3, dimension=D)
-        self.bn5 = ME.MinkowskiBatchNorm(self.inplanes)
+  def network_initialization(self, in_channels, out_channels, D):
 
-        self.glob_avg = ME.MinkowskiGlobalPooling(dimension=D)
+    def space_n_time_m(n, m):
+      return n if D == 3 else [n, n, n, m]
 
-        self.final = ME.MinkowskiLinear(self.inplanes, out_channels, bias=True)
+    if D == 4:
+      self.OUT_PIXEL_DIST = space_n_time_m(self.OUT_PIXEL_DIST, 1)
 
-    def weight_initialization(self):
-        for m in self.modules():
-            if isinstance(m, ME.MinkowskiConvolution):
-                ME.utils.kaiming_normal_(m.kernel, mode='fan_out', nonlinearity='relu')
+    dilations = [1, 1, 1, 1]
+    bn_momentum = 0.02
+    self.inplanes = self.INIT_DIM
+    self.conv1 = conv(
+        in_channels,
+        self.inplanes,
+        kernel_size=space_n_time_m(3, 1),
+        stride=1,
+        D=D)
 
-            if isinstance(m, ME.MinkowskiBatchNorm):
-                nn.init.constant_(m.bn.weight, 1)
-                nn.init.constant_(m.bn.bias, 0)
+    self.bn1 = get_norm(NormType.BATCH_NORM, self.inplanes, D=self.D, bn_momentum=bn_momentum)
+    self.relu = ME.MinkowskiReLU(inplace=True)
+    self.pool = sum_pool(kernel_size=space_n_time_m(2, 1), stride=space_n_time_m(2, 1), D=D)
 
-    def _make_layer(self,
-                    block,
-                    planes,
-                    blocks,
-                    stride=1,
-                    dilation=1,
-                    bn_momentum=0.1):
-        downsample = None
-        if stride != 1 or self.inplanes != planes * block.expansion:
-            downsample = nn.Sequential(
-                ME.MinkowskiConvolution(
-                    self.inplanes,
-                    planes * block.expansion,
-                    kernel_size=1,
-                    stride=stride,
-                    dimension=self.D),
-                ME.MinkowskiBatchNorm(planes * block.expansion))
-        layers = []
-        layers.append(
-            block(
-                self.inplanes,
-                planes,
-                stride=stride,
-                dilation=dilation,
-                downsample=downsample,
-                dimension=self.D))
-        self.inplanes = planes * block.expansion
-        for i in range(1, blocks):
-            layers.append(
-                block(
-                    self.inplanes,
-                    planes,
-                    stride=1,
-                    dilation=dilation,
-                    dimension=self.D))
+    self.layer1 = self._make_layer(
+        self.BLOCK,
+        self.PLANES[0],
+        self.LAYERS[0],
+        stride=space_n_time_m(2, 1),
+        dilation=space_n_time_m(dilations[0], 1))
+    self.layer2 = self._make_layer(
+        self.BLOCK,
+        self.PLANES[1],
+        self.LAYERS[1],
+        stride=space_n_time_m(2, 1),
+        dilation=space_n_time_m(dilations[1], 1))
+    self.layer3 = self._make_layer(
+        self.BLOCK,
+        self.PLANES[2],
+        self.LAYERS[2],
+        stride=space_n_time_m(2, 1),
+        dilation=space_n_time_m(dilations[2], 1))
+    self.layer4 = self._make_layer(
+        self.BLOCK,
+        self.PLANES[3],
+        self.LAYERS[3],
+        stride=space_n_time_m(2, 1),
+        dilation=space_n_time_m(dilations[3], 1))
 
-        return nn.Sequential(*layers)
+    self.final = conv(
+        self.PLANES[3] * self.BLOCK.expansion, out_channels, kernel_size=1, bias=True, D=D)
 
-    def forward(self, x):
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.relu(x)
-        x = self.pool(x)
+  def weight_initialization(self):
+    for m in self.modules():
+      if isinstance(m, ME.MinkowskiBatchNorm):
+        nn.init.constant_(m.bn.weight, 1)
+        nn.init.constant_(m.bn.bias, 0)
 
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-        x = self.layer4(x)
+  def _make_layer(self,
+                  block,
+                  planes,
+                  blocks,
+                  stride=1,
+                  dilation=1,
+                  norm_type=NormType.BATCH_NORM,
+                  bn_momentum=0.1):
+    downsample = None
+    if stride != 1 or self.inplanes != planes * block.expansion:
+      downsample = nn.Sequential(
+          conv(
+              self.inplanes,
+              planes * block.expansion,
+              kernel_size=1,
+              stride=stride,
+              bias=False,
+              D=self.D),
+          get_norm(norm_type, planes * block.expansion, D=self.D, bn_momentum=bn_momentum),
+      )
+    layers = []
+    layers.append(
+        block(
+            self.inplanes,
+            planes,
+            stride=stride,
+            dilation=dilation,
+            downsample=downsample,
+            conv_type=self.CONV_TYPE,
+            D=self.D))
+    self.inplanes = planes * block.expansion
+    for i in range(1, blocks):
+      layers.append(
+          block(
+              self.inplanes,
+              planes,
+              stride=1,
+              dilation=dilation,
+              conv_type=self.CONV_TYPE,
+              D=self.D))
 
-        x = self.conv5(x)
-        x = self.bn5(x)
-        x = self.relu(x)
+    return nn.Sequential(*layers)
 
-        x = self.glob_avg(x)
-        return self.final(x)
+  def forward(self, x):
+    x = self.conv1(x)
+    x = self.bn1(x)
+    x = self.relu(x)
+    x = self.pool(x)
+
+    x = self.layer1(x)
+    x = self.layer2(x)
+    x = self.layer3(x)
+    x = self.layer4(x)
+
+    x = self.final(x)
+    return x
 
 
 class ResNet14(ResNetBase):
-    BLOCK = BasicBlock
-    LAYERS = (1, 1, 1, 1)
+  BLOCK = BasicBlock
+  LAYERS = (1, 1, 1, 1)
 
 
 class ResNet18(ResNetBase):
-    BLOCK = BasicBlock
-    LAYERS = (2, 2, 2, 2)
+  BLOCK = BasicBlock
+  LAYERS = (2, 2, 2, 2)
 
 
 class ResNet34(ResNetBase):
-    BLOCK = BasicBlock
-    LAYERS = (3, 4, 6, 3)
+  BLOCK = BasicBlock
+  LAYERS = (3, 4, 6, 3)
 
 
 class ResNet50(ResNetBase):
-    BLOCK = Bottleneck
-    LAYERS = (3, 4, 6, 3)
+  BLOCK = Bottleneck
+  LAYERS = (3, 4, 6, 3)
 
 
 class ResNet101(ResNetBase):
-    BLOCK = Bottleneck
-    LAYERS = (3, 4, 23, 3)
+  BLOCK = Bottleneck
+  LAYERS = (3, 4, 23, 3)
+
+
+class STResNetBase(ResNetBase):
+
+  CONV_TYPE = ConvType.SPATIAL_HYPERCUBE_TEMPORAL_HYPERCROSS
+
+  def __init__(self, in_channels, out_channels, config, D=4, **kwargs):
+    super(STResNetBase, self).__init__(in_channels, out_channels, config, D, **kwargs)
+
+
+class STResNet14(STResNetBase, ResNet14):
+  pass
+
+
+class STResNet18(STResNetBase, ResNet18):
+  pass
+
+
+class STResNet34(STResNetBase, ResNet34):
+  pass
+
+
+class STResNet50(STResNetBase, ResNet50):
+  pass
+
+
+class STResNet101(STResNetBase, ResNet101):
+  pass
+
+
+class STResTesseractNetBase(STResNetBase):
+  CONV_TYPE = ConvType.HYPERCUBE
+
+
+class STResTesseractNet14(STResTesseractNetBase, STResNet14):
+  pass
+
+
+class STResTesseractNet18(STResTesseractNetBase, STResNet18):
+  pass
+
+
+class STResTesseractNet34(STResTesseractNetBase, STResNet34):
+  pass
+
+
+class STResTesseractNet50(STResTesseractNetBase, STResNet50):
+  pass
+
+
+class STResTesseractNet101(STResTesseractNetBase, STResNet101):
+  pass
