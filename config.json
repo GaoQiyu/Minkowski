@@ -1,5 +1,5 @@
 {
-  "fine_tune": true,
+  "fine_tune": false,
   "use_cuda": true,
   "multiple_fold": false,
   "class": 14,
@@ -10,6 +10,7 @@
   "epoch": 100,
   "voxel_size": 0.05,
   "point_num": 30000,
+  "accumulate_gradient": 0.1,
 
   "data_path": "/home/gaoqiyu/文档/Stanford3dDataset_v1.2_Aligned_Version/split",
   "log_path": "/home/gaoqiyu/PycharmProjects/PointCloudSeg_Minkowski/log",
