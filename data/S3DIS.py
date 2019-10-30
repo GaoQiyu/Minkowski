@@ -1,8 +1,6 @@
 import os
 import numpy as np
-import torch
 from torch.utils.data import Dataset
-import MinkowskiEngine as ME
 
 
 class S3DISDataset(Dataset):
@@ -31,14 +29,7 @@ class S3DISDataset(Dataset):
         coords, feats, label = point[:, :3], point[:, 3:6]/256, point[:, -1]
         if self.transformations:
             coords, feats = self.transformations(coords, feats)
-
-        coords = np.floor(coords/self.voxel_size)
-        inds = ME.utils.sparse_quantize(coords, return_index=True)
-        coordinates, features, label = coords[inds], feats[inds], label[inds]
-        # coordinates, features = ME.utils.sparse_collate(coordinates, features)
-
-        # return [ME.SparseTensor(features, coords=coordinates), torch.from_numpy(label)]
-        return (coordinates, features, label.reshape(-1, 1))
+        return (coords, feats, label.reshape(-1, 1))
 
     def __len__(self):
         return self.length

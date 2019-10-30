@@ -3,11 +3,13 @@ import json
 import torch
 import math
 import time
-from tensorboardX import SummaryWriter
-import model.minkunet as Minkowski
+import numpy as np
+import MinkowskiEngine as ME
+import model.pointnet as PointNet
+import model.resunet as ResUNet
 from data import dataloader
 from model.evaluator import Evaluator
-import MinkowskiEngine as ME
+from tensorboardX import SummaryWriter
 
 
 class Trainer(object):
@@ -19,19 +21,21 @@ class Trainer(object):
         self.epoch = 0
         self.device = torch.device(0)
         self.batch_size = self.config["batch_size"]
-        self.model = Minkowski.MinkUNet34C(3, self.config["class"])
+        # self.model = PointNet.PointNet(self.config["class"])
+        self.model = ResUNet.ResUNetIN14(3, self.config["class"])
         if self.config["fine_tune"]:
             model_dict = torch.load(os.path.join(config["resume_path"], 'weights_14.pth'), map_location=lambda storage, loc: storage.cuda(self.device))
             self.model.load_state_dict(model_dict)
         if self.config["use_cuda"]:
             self.model = self.model.to(self.device)
 
-        self.optimizer = torch.optim.SGD([
-            {'params': self.model.convtr7p2s2.parameters(), 'lr': self.config["lr"] / 1e2},
-            {'params': self.model.bntr7.parameters(), 'lr': self.config["lr"] / 1e2},
-            {'params': self.model.block8.parameters(), 'lr': self.config["lr"] / 1e1},
-            {'params': self.model.final.parameters(), 'lr': self.config["lr"]}],
-            lr=self.config["lr"] / 1e4, momentum=self.config["momentum"], weight_decay=1e-4)
+        # self.optimizer = torch.optim.SGD([
+        #     {'params': self.model.convtr7p2s2.parameters(), 'lr': self.config["lr"] / 1e2},
+        #     {'params': self.model.bntr7.parameters(), 'lr': self.config["lr"] / 1e2},
+        #     {'params': self.model.block8.parameters(), 'lr': self.config["lr"] / 1e1},
+        #     {'params': self.model.final.parameters(), 'lr': self.config["lr"]}],
+        #     lr=self.config["lr"] / 1e4, momentum=self.config["momentum"], weight_decay=1e-4)
+        self.optimizer = torch.optim.SGD(self.model.parameters(), lr=0.1, momentum=0.9, weight_decay=1e-4)
         self.lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer)
         self.loss = torch.nn.CrossEntropyLoss()
 
@@ -49,18 +53,17 @@ class Trainer(object):
         epoch_loss = 0
         self.model.train()
         for ith, data_dict in enumerate(self.train_data):
-            point = ME.SparseTensor(data_dict['feats'], data_dict['coords'].int())
-            if self.config["use_cuda"]:
-                point.to(self.device)
-            labels = data_dict['labels']
-
+            point, labels = self.data_preprocess(data_dict)
+            self.optimizer.zero_grad()
+            # self.model.initialize_coords()
+            # self.model.clear()
             output_sparse = self.model(point)
             pred = output_sparse.F
             loss = self.loss(pred.cpu(), labels)
+            loss /= self.config["accumulate_gradient"]
             loss.backward()
             self.optimizer.step()
             self.lr_scheduler.step(epoch_)
-            self.optimizer.zero_grad()
 
             epoch_loss += loss.item()
 
@@ -76,15 +79,12 @@ class Trainer(object):
         self.model.eval()
         mIOU_epoch = 0
         for ith, data_dict in enumerate(self.val_data):
-            point = ME.SparseTensor(data_dict['feats'], data_dict['coords'].int())
-            if self.config["use_cuda"]:
-                point.to(self.device)
-            label = data_dict['labels']
+            point, labels = self.data_preprocess(data_dict)
 
             with torch.no_grad():
                 output = self.model(point)
             pred = output.F.max(1)[1]
-            IOU, mIOU = self.evaluator.mIOU(pred.cpu(), label)
+            IOU, mIOU = self.evaluator.mIOU(pred.cpu(), labels)
             mIOU_epoch += mIOU
 
             self.val_iter_number += 1
@@ -119,6 +119,20 @@ class Trainer(object):
                     'train_iter_number': self.train_iter_number,
                     'val_iter_number': self.val_iter_number},
                    os.path.join(self.config["resume_path"], 'parameters.pth'))
+
+    def data_preprocess(self, data_dict):
+        coords = data_dict['coords']
+        feats = data_dict['feats']
+        labels = data_dict['labels']
+
+        coords[:, :3] = np.floor(coords[:, :3] / self.config['voxel_size'])
+        inds = ME.utils.sparse_quantize(coords[:, :3].numpy(), return_index=True)
+        np.random.shuffle(inds)
+        coordinates, features, labels = coords[inds], feats[inds], labels[inds]
+        point = ME.SparseTensor(features, coordinates.int())
+        if self.config["use_cuda"]:
+            point.to(self.device)
+        return point, labels
 
 
 if __name__ == '__main__':
