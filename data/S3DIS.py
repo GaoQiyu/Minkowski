@@ -26,7 +26,7 @@ class S3DISDataset(Dataset):
                 tmp = np.append(tmp, np.array(cat).repeat(len(tmp)).reshape(-1, 1), axis=1)
                 point = np.append(point, tmp, axis=0)
         point = np.delete(point, 0, axis=0)
-        coords, feats, label = point[:, :3], point[:, 3:6]/256, point[:, -1]
+        coords, feats, label = point[:, :3], point[:, 3:6]/256 - 0.5, point[:, -1]
         if self.transformations:
             coords, feats = self.transformations(coords, feats)
         return (coords, feats, label.reshape(-1, 1))

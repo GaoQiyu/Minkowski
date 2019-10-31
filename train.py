@@ -26,20 +26,20 @@ class Trainer(object):
         if self.config["fine_tune"]:
             model_dict = torch.load(os.path.join(config["resume_path"], 'weights_14.pth'), map_location=lambda storage, loc: storage.cuda(self.device))
             self.model.load_state_dict(model_dict)
+            self.optimizer = torch.optim.SGD([
+                {'params': self.model.convtr7p2s2.parameters(), 'lr': self.config["lr"] / 1e2},
+                {'params': self.model.bntr7.parameters(), 'lr': self.config["lr"] / 1e2},
+                {'params': self.model.block8.parameters(), 'lr': self.config["lr"] / 1e1},
+                {'params': self.model.final.parameters(), 'lr': self.config["lr"]}],
+                lr=self.config["lr"] / 1e4, momentum=self.config["momentum"], weight_decay=1e-4)
         if self.config["use_cuda"]:
             self.model = self.model.to(self.device)
-
-        # self.optimizer = torch.optim.SGD([
-        #     {'params': self.model.convtr7p2s2.parameters(), 'lr': self.config["lr"] / 1e2},
-        #     {'params': self.model.bntr7.parameters(), 'lr': self.config["lr"] / 1e2},
-        #     {'params': self.model.block8.parameters(), 'lr': self.config["lr"] / 1e1},
-        #     {'params': self.model.final.parameters(), 'lr': self.config["lr"]}],
-        #     lr=self.config["lr"] / 1e4, momentum=self.config["momentum"], weight_decay=1e-4)
         self.optimizer = torch.optim.SGD(self.model.parameters(), lr=0.1, momentum=0.9, weight_decay=1e-4)
-        self.lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer)
+        # self.lr_scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=2e4, gamma=0.1, last_epoch=-1)
+        self.lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, patience=3)
         self.loss = torch.nn.CrossEntropyLoss()
 
-        self.train_data = dataloader(self.config["batch_size"], self.config["data_path"], voxel_size=self.config["voxel_size"], transform=True, shuffle=True)
+        self.train_data = dataloader(self.config["batch_size"], self.config["data_path"], voxel_size=self.config["voxel_size"], transform=False, shuffle=True)
         self.val_data = dataloader(self.config["batch_size"], self.config["data_path"], data_type='val', voxel_size=config["voxel_size"])
 
         log_path = os.path.join(config["log_path"], str(time.time()))
@@ -55,16 +55,17 @@ class Trainer(object):
         for ith, data_dict in enumerate(self.train_data):
             point, labels = self.data_preprocess(data_dict)
             self.optimizer.zero_grad()
-            # self.model.initialize_coords()
-            # self.model.clear()
             output_sparse = self.model(point)
             pred = output_sparse.F
             loss = self.loss(pred.cpu(), labels)
             loss /= self.config["accumulate_gradient"]
             loss.backward()
             self.optimizer.step()
-            self.lr_scheduler.step(epoch_)
             epoch_loss += loss.item()
+
+            # # StepLR
+            # self.lr_scheduler.step(self.train_iter_number)
+
             self.train_iter_number += 1
             self.summary.add_scalar('train/loss: ', loss.item(), self.train_iter_number)
             print("train epoch:  {}/{}, ith:  {}/{}, loss:  {}".format(epoch_, self.config['epoch'], ith, len(self.train_data), loss.item()))
@@ -89,6 +90,10 @@ class Trainer(object):
             self.summary.add_scalar('val/mIOU', mIOU, self.val_iter_number)
             print("val epoch:  {}/{}, ith:  {}/{}, mIOU:  {}%".format(epoch_, self.config['epoch'], ith, len(self.val_data), mIOU*100))
         average_mIOU = mIOU_epoch/len(self.val_data)
+
+        # ReduceLROnPlateau
+        self.lr_scheduler.step(average_mIOU)
+
         self.summary.add_scalar('val/mIOU_epoch', average_mIOU, epoch_)
         print("epoch:    {}/{}, average_mIOU:    {}%".format(epoch_, self.config['epoch'], average_mIOU*100))
         print('------------------------------------------------------------------')
@@ -148,7 +153,6 @@ if __name__ == '__main__':
         trainer.train(epoch)
         trainer.eval(epoch)
         print('one epoch time:   {} s'.format(time.time() - time_now))
-        trainer.summary.add_scalar('epoch_time', time.time() - time_now, epoch)
         trainer.summary.close()
         time_now = time.time()
 

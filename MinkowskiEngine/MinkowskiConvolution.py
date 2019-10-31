@@ -278,9 +278,11 @@ class MinkowskiConvolutionBase(MinkowskiModuleBase):
         n = (self.out_channels
              if is_transpose else self.in_channels) * self.kernel_volume
         stdv = 1. / math.sqrt(n)
-        self.kernel.data.uniform_(-stdv, stdv)
+
+        # todo eval the field , default -stdv stdv
+        self.kernel.data.normal_(-1, 1)
         if self.bias is not None:
-            self.bias.data.uniform_(-stdv, stdv)
+            self.bias.data.normal_(-1, 1)
 
     def __repr__(self):
         s = '(in={}, out={}, region_type={}, '.format(
