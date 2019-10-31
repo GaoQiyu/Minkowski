@@ -64,9 +64,7 @@ class Trainer(object):
             loss.backward()
             self.optimizer.step()
             self.lr_scheduler.step(epoch_)
-
             epoch_loss += loss.item()
-
             self.train_iter_number += 1
             self.summary.add_scalar('train/loss: ', loss.item(), self.train_iter_number)
             print("train epoch:  {}/{}, ith:  {}/{}, loss:  {}".format(epoch_, self.config['epoch'], ith, len(self.train_data), loss.item()))
