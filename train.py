@@ -35,12 +35,12 @@ class Trainer(object):
         if self.config["use_cuda"]:
             self.model = self.model.to(self.device)
         self.optimizer = torch.optim.SGD(self.model.parameters(), lr=0.1, momentum=0.9, weight_decay=1e-4)
-        # self.lr_scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=2e4, gamma=0.1, last_epoch=-1)
-        self.lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, patience=3)
+        self.lr_scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=20, gamma=0.1, last_epoch=-1)
+        # self.lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, patience=3)
         self.loss = torch.nn.CrossEntropyLoss()
 
-        self.train_data = dataloader(self.config["batch_size"], self.config["data_path"], voxel_size=self.config["voxel_size"], transform=False, shuffle=True)
-        self.val_data = dataloader(self.config["batch_size"], self.config["data_path"], data_type='val', voxel_size=config["voxel_size"])
+        self.train_data = dataloader(1, self.config["data_path"], voxel_size=self.config["voxel_size"], transform=False, shuffle=True)
+        self.val_data = dataloader(1, self.config["data_path"], data_type='val', voxel_size=config["voxel_size"])
 
         log_path = os.path.join(config["log_path"], str(time.time()))
         os.mkdir(log_path) if not os.path.exists(log_path) else None
@@ -51,6 +51,7 @@ class Trainer(object):
 
     def train(self, epoch_):
         epoch_loss = 0
+        batch_loss = 0
         self.model.train()
         for ith, data_dict in enumerate(self.train_data):
             point, labels = self.data_preprocess(data_dict)
@@ -59,17 +60,20 @@ class Trainer(object):
             pred = output_sparse.F
             loss = self.loss(pred.cpu(), labels)
             loss /= self.config["accumulate_gradient"]
-            loss.backward()
             self.optimizer.step()
+            batch_loss += loss.item()
             epoch_loss += loss.item()
-
-            # # StepLR
-            # self.lr_scheduler.step(self.train_iter_number)
-
             self.train_iter_number += 1
-            self.summary.add_scalar('train/loss: ', loss.item(), self.train_iter_number)
-            print("train epoch:  {}/{}, ith:  {}/{}, loss:  {}".format(epoch_, self.config['epoch'], ith, len(self.train_data), loss.item()))
+            if self.train_iter_number % self.batch_size == 0:
+                loss.backward()
+                batch_loss = 0
+                self.summary.add_scalar('train/loss: ', batch_loss, self.train_iter_number//self.batch_size)
+                print("train epoch:  {}/{}, ith:  {}/{}, loss:  {}".format(epoch_, self.config['epoch'], ith, len(self.train_data)//self.batch_size, batch_loss))
         average_loss = epoch_loss/len(self.train_data)
+        # StepLR
+        self.lr_scheduler.step(epoch_)
+        # ReduceLROnPlateau
+        # self.lr_scheduler.step(average_loss)
         self.summary.add_scalar('train/loss_epoch: ', average_loss, epoch_)
         print("epoch:    {}/{}, average_loss:    {}".format(epoch_, self.config['epoch'], average_loss))
         print('------------------------------------------------------------------')
@@ -91,9 +95,6 @@ class Trainer(object):
             print("val epoch:  {}/{}, ith:  {}/{}, mIOU:  {}%".format(epoch_, self.config['epoch'], ith, len(self.val_data), mIOU*100))
         average_mIOU = mIOU_epoch/len(self.val_data)
 
-        # ReduceLROnPlateau
-        self.lr_scheduler.step(average_mIOU)
-
         self.summary.add_scalar('val/mIOU_epoch', average_mIOU, epoch_)
         print("epoch:    {}/{}, average_mIOU:    {}%".format(epoch_, self.config['epoch'], average_mIOU*100))
         print('------------------------------------------------------------------')
@@ -104,7 +105,7 @@ class Trainer(object):
         if os.path.isfile(load_path):
             load_parameters = torch.load(load_path, map_location=lambda storage, loc: storage.cuda(self.device))
             self.optimizer.load_state_dict(load_parameters['optimizer'])
-            self.lr_scheduler.load_state_dict(load_parameters['lr_scheduler'])
+            # self.lr_scheduler.load_state_dict(load_parameters['lr_scheduler'])
             self.model.load_state_dict(load_parameters['model'])
             self.best_pred = load_parameters['best_prediction']
             self.epoch = load_parameters['epoch']
@@ -148,8 +149,8 @@ if __name__ == '__main__':
     time_now = time.time()
     for epoch in range(trainer.epoch, config["epoch"]):
         if config["multiple_fold"]:
-            trainer.train_data = dataloader(config["batch_size"], config["data_path"], fold=epoch%3, voxel_size=config["voxel_size"], transform=True, shuffle=True)
-            trainer.val_data = dataloader(config["batch_size"], config["data_path"], fold=epoch%3, data_type='val', voxel_size=config["voxel_size"])
+            trainer.train_data = dataloader(1, config["data_path"], fold=epoch%3, voxel_size=config["voxel_size"], transform=True, shuffle=True)
+            trainer.val_data = dataloader(1, config["data_path"], fold=epoch%3, data_type='val', voxel_size=config["voxel_size"])
         trainer.train(epoch)
         trainer.eval(epoch)
         print('one epoch time:   {} s'.format(time.time() - time_now))

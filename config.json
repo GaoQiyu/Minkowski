@@ -6,7 +6,7 @@
 
   "lr": 0.1,
   "momentum": 0.9,
-  "batch_size": 1,
+  "batch_size": 14,
   "epoch": 100,
   "voxel_size": 0.06,
   "point_num": 30000,
