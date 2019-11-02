@@ -20,6 +20,8 @@ class Trainer(object):
         self.val_iter_number = 0
         self.epoch = 0
         self.device = torch.device(0)
+        self.loss_value = torch.tensor(0.0, requires_grad=True).to(self.device)
+        self.point_number = self.config["point_num"]
         self.batch_size = self.config["batch_size"]
         # self.model = PointNet.PointNet(self.config["class"])
         self.model = ResUNet.ResUNetIN14(3, self.config["class"])
@@ -51,28 +53,26 @@ class Trainer(object):
 
     def train(self, epoch_):
         epoch_loss = 0
-        batch_loss = 0
         self.model.train()
         for ith, data_dict in enumerate(self.train_data):
             point, labels = self.data_preprocess(data_dict)
-            self.optimizer.zero_grad()
             output_sparse = self.model(point)
             pred = output_sparse.F
-            loss = self.loss(pred.cpu(), labels)
-            loss /= self.config["accumulate_gradient"]
-            self.optimizer.step()
-            batch_loss += loss.item()
-            epoch_loss += loss.item()
+            self.loss_value = self.loss(pred, labels) + self.loss_value
             self.train_iter_number += 1
+            epoch_loss += self.loss_value.item()
             if self.train_iter_number % self.batch_size == 0:
-                loss.backward()
-                batch_loss = 0
-                self.summary.add_scalar('train/loss: ', batch_loss, self.train_iter_number//self.batch_size)
-                print("train epoch:  {}/{}, ith:  {}/{}, loss:  {}".format(epoch_, self.config['epoch'], ith, len(self.train_data)//self.batch_size, batch_loss))
+                self.loss_value /= (self.config["accumulate_gradient"]*self.batch_size)
+                self.loss_value.backward()
+                self.optimizer.step()
+                self.optimizer.zero_grad()
+                self.summary.add_scalar('train/loss: ', self.loss_value, self.train_iter_number // self.batch_size)
+                print("train epoch:  {}/{}, ith:  {}/{}, loss:  {}".format(epoch_, self.config['epoch'], ith, len(self.train_data), self.loss_value.item()))
+                self.loss_value = 0
         average_loss = epoch_loss/len(self.train_data)
         # StepLR
         self.lr_scheduler.step(epoch_)
-        # ReduceLROnPlateau
+        # # ReduceLROnPlateau
         # self.lr_scheduler.step(average_loss)
         self.summary.add_scalar('train/loss_epoch: ', average_loss, epoch_)
         print("epoch:    {}/{}, average_loss:    {}".format(epoch_, self.config['epoch'], average_loss))
@@ -105,12 +105,13 @@ class Trainer(object):
         if os.path.isfile(load_path):
             load_parameters = torch.load(load_path, map_location=lambda storage, loc: storage.cuda(self.device))
             self.optimizer.load_state_dict(load_parameters['optimizer'])
-            # self.lr_scheduler.load_state_dict(load_parameters['lr_scheduler'])
+            self.lr_scheduler.load_state_dict(load_parameters['lr_scheduler'])
             self.model.load_state_dict(load_parameters['model'])
             self.best_pred = load_parameters['best_prediction']
             self.epoch = load_parameters['epoch']
             self.train_iter_number = load_parameters['train_iter_number']
             self.val_iter_number = load_parameters['val_iter_number']
+            self.loss_value = load_parameters['loss_value']
             self.model = self.model.to(self.device)
 
     def save(self, epoch_):
@@ -121,7 +122,8 @@ class Trainer(object):
                     'lr_scheduler': self.lr_scheduler.state_dict(),
                     'epoch': epoch_,
                     'train_iter_number': self.train_iter_number,
-                    'val_iter_number': self.val_iter_number},
+                    'val_iter_number': self.val_iter_number,
+                    'loss_value': self.loss_value},
                    os.path.join(self.config["resume_path"], 'parameters.pth'))
 
     def data_preprocess(self, data_dict):
@@ -131,12 +133,15 @@ class Trainer(object):
 
         coords[:, :3] = np.floor(coords[:, :3] / self.config['voxel_size'])
         inds = ME.utils.sparse_quantize(coords[:, :3].numpy(), return_index=True)
-        np.random.shuffle(inds)
+
+        if len(inds) > self.point_number:
+            inds = np.random.choice(inds, self.point_number, replace=False)
         coordinates, features, labels = coords[inds], feats[inds], labels[inds]
-        point = ME.SparseTensor(features, coordinates.int())
+        points = ME.SparseTensor(features, coordinates.int())
+
         if self.config["use_cuda"]:
-            point.to(self.device)
-        return point, labels
+            points, labels = points.to(self.device), labels.to(self.device)
+        return points, labels
 
 
 if __name__ == '__main__':

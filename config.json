@@ -6,8 +6,8 @@
 
   "lr": 0.1,
   "momentum": 0.9,
-  "batch_size": 14,
-  "epoch": 100,
+  "batch_size": 8,
+  "epoch": 10000,
   "voxel_size": 0.06,
   "point_num": 30000,
   "accumulate_gradient": 0.1,
