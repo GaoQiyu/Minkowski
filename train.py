@@ -59,8 +59,8 @@ class Trainer(object):
             output_sparse = self.model(point)
             pred = output_sparse.F
             self.loss_value = self.loss(pred, labels) + self.loss_value
+            epoch_loss += self.loss(pred, labels).item()
             self.train_iter_number += 1
-            epoch_loss += self.loss_value.item()
             if self.train_iter_number % self.batch_size == 0:
                 self.loss_value /= (self.config["accumulate_gradient"]*self.batch_size)
                 self.loss_value.backward()
@@ -87,7 +87,7 @@ class Trainer(object):
             with torch.no_grad():
                 output = self.model(point)
             pred = output.F.max(1)[1]
-            IOU, mIOU = self.evaluator.mIOU(pred.cpu(), labels)
+            IOU, mIOU = self.evaluator.mIOU(pred.cpu(), labels.cpu())
             mIOU_epoch += mIOU
 
             self.val_iter_number += 1

@@ -8,8 +8,8 @@
   "momentum": 0.9,
   "batch_size": 8,
   "epoch": 10000,
-  "voxel_size": 0.06,
-  "point_num": 30000,
+  "voxel_size": 0.05,
+  "point_num": 60000,
   "accumulate_gradient": 0.1,
 
   "data_path": "/home/gaoqiyu/文档/Stanford3dDataset_v1.2_Aligned_Version/split",
