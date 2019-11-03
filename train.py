@@ -59,7 +59,7 @@ class Trainer(object):
             output_sparse = self.model(point)
             pred = output_sparse.F
             self.loss_value = self.loss(pred, labels) + self.loss_value
-            epoch_loss += self.loss(pred, labels).item()
+            epoch_loss += self.loss(pred, labels).item() / self.config["accumulate_gradient"]
             self.train_iter_number += 1
             if self.train_iter_number % self.batch_size == 0:
                 self.loss_value /= (self.config["accumulate_gradient"]*self.batch_size)
@@ -81,22 +81,42 @@ class Trainer(object):
     def eval(self, epoch_):
         self.model.eval()
         mIOU_epoch = 0
+        accuracy_epoch = 0
+        precision_epoch = 0
+        recall_epoch = 0
         for ith, data_dict in enumerate(self.val_data):
             point, labels = self.data_preprocess(data_dict)
 
             with torch.no_grad():
                 output = self.model(point)
             pred = output.F.max(1)[1]
-            IOU, mIOU = self.evaluator.mIOU(pred.cpu(), labels.cpu())
+            mIOU, accuracy, precision, recall = self.evaluator.generate(pred.cpu(), labels.cpu())
+
             mIOU_epoch += mIOU
+            accuracy_epoch += accuracy
+            precision_epoch += precision
+            recall_epoch += recall
 
             self.val_iter_number += 1
             self.summary.add_scalar('val/mIOU', mIOU, self.val_iter_number)
-            print("val epoch:  {}/{}, ith:  {}/{}, mIOU:  {}%".format(epoch_, self.config['epoch'], ith, len(self.val_data), mIOU*100))
+            self.summary.add_scalar('val/accuracy', accuracy, self.val_iter_number)
+            self.summary.add_scalar('val/precision', precision, self.val_iter_number)
+            self.summary.add_scalar('val/recall', recall, self.val_iter_number)
+
+            print("val epoch:  {}/{}, ith:  {}/{}, mIOU:  {}%, accuracy  {}%，precision  {}%，recall  {}%".format(epoch_,
+                  self.config['epoch'], ith, len(self.val_data), mIOU*100, accuracy*100, precision*100, recall*100))
         average_mIOU = mIOU_epoch/len(self.val_data)
+        average_accuracy = accuracy_epoch / len(self.val_data)
+        average_precision = precision_epoch / len(self.val_data)
+        average_recall = recall_epoch / len(self.val_data)
 
         self.summary.add_scalar('val/mIOU_epoch', average_mIOU, epoch_)
-        print("epoch:    {}/{}, average_mIOU:    {}%".format(epoch_, self.config['epoch'], average_mIOU*100))
+        self.summary.add_scalar('val/accuracy_epoch', average_accuracy, epoch_)
+        self.summary.add_scalar('val/precision_epoch', average_precision, epoch_)
+        self.summary.add_scalar('val/recall_epoch', average_recall, epoch_)
+
+        print("epoch:  {}/{}, average_mIOU:  {}%, average_accuracy：  {}%, average_precision：  {}%, average_recall：  {}%"
+              .format(epoch_, self.config['epoch'], average_mIOU*100, average_accuracy*100, average_precision*100, average_recall*100))
         print('------------------------------------------------------------------')
         self.save(epoch_) if average_mIOU < self.best_pred else None
 
