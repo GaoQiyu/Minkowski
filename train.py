@@ -15,7 +15,7 @@ from tensorboardX import SummaryWriter
 class Trainer(object):
     def __init__(self, config_):
         self.config = config_
-        self.best_pred = math.inf
+        self.best_pred = -math.inf
         self.train_iter_number = 0
         self.val_iter_number = 0
         self.epoch = 0
@@ -36,8 +36,11 @@ class Trainer(object):
                 lr=self.config["lr"] / 1e4, momentum=self.config["momentum"], weight_decay=1e-4)
         if self.config["use_cuda"]:
             self.model = self.model.to(self.device)
-        self.optimizer = torch.optim.SGD(self.model.parameters(), lr=0.1, momentum=0.9, weight_decay=1e-4)
-        self.lr_scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=20, gamma=0.1, last_epoch=-1)
+        # self.optimizer = torch.optim.SGD(self.model.parameters(), lr=self.config['lr'],
+        #                                  momentum=self.config['momentum'], weight_decay=self.config['weight_decay'])
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.config['lr'],
+                                          weight_decay=self.config['weight_decay'])
+        self.lr_scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=self.config['step_size'], gamma=0.1, last_epoch=-1)
         # self.lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, patience=3)
         self.loss = torch.nn.CrossEntropyLoss()
 
@@ -84,14 +87,16 @@ class Trainer(object):
         accuracy_epoch = 0
         precision_epoch = 0
         recall_epoch = 0
+        epoch_loss = 0
         for ith, data_dict in enumerate(self.val_data):
             point, labels = self.data_preprocess(data_dict)
 
             with torch.no_grad():
                 output = self.model(point)
-            pred = output.F.max(1)[1]
-            mIOU, accuracy, precision, recall = self.evaluator.generate(pred.cpu(), labels.cpu())
-
+            pred = output.F
+            loss_eval = self.loss(pred, labels) / self.config["accumulate_gradient"]
+            epoch_loss += loss_eval.item()
+            mIOU, accuracy, precision, recall = self.evaluator.generate(pred.max(1)[1].cpu(), labels.cpu())
             mIOU_epoch += mIOU
             accuracy_epoch += accuracy
             precision_epoch += precision
@@ -102,23 +107,28 @@ class Trainer(object):
             self.summary.add_scalar('val/accuracy', accuracy, self.val_iter_number)
             self.summary.add_scalar('val/precision', precision, self.val_iter_number)
             self.summary.add_scalar('val/recall', recall, self.val_iter_number)
+            self.summary.add_scalar('val/loss: ', loss_eval, self.val_iter_number)
 
-            print("val epoch:  {}/{}, ith:  {}/{}, mIOU:  {}%, accuracy  {}%，precision  {}%，recall  {}%".format(epoch_,
-                  self.config['epoch'], ith, len(self.val_data), mIOU*100, accuracy*100, precision*100, recall*100))
+            print("val epoch:  {}/{}, ith:  {}/{}, loss：  {}, mIOU:  {}%, accuracy  {}%，precision  {}%，recall  {}%"
+                  .format(epoch_, self.config['epoch'], ith, len(self.val_data), loss_eval, mIOU*100, accuracy*100, precision*100, recall*100))
+        average_loss = epoch_loss / len(self.val_data)
         average_mIOU = mIOU_epoch/len(self.val_data)
         average_accuracy = accuracy_epoch / len(self.val_data)
         average_precision = precision_epoch / len(self.val_data)
         average_recall = recall_epoch / len(self.val_data)
 
+        self.summary.add_scalar('val/loss_epoch', average_loss, epoch_)
         self.summary.add_scalar('val/mIOU_epoch', average_mIOU, epoch_)
         self.summary.add_scalar('val/accuracy_epoch', average_accuracy, epoch_)
         self.summary.add_scalar('val/precision_epoch', average_precision, epoch_)
         self.summary.add_scalar('val/recall_epoch', average_recall, epoch_)
 
-        print("epoch:  {}/{}, average_mIOU:  {}%, average_accuracy：  {}%, average_precision：  {}%, average_recall：  {}%"
-              .format(epoch_, self.config['epoch'], average_mIOU*100, average_accuracy*100, average_precision*100, average_recall*100))
+        print("epoch:  {}/{}, average_loss： {}，average_mIOU:  {}%, average_accuracy：  {}%, average_precision：  {}%, average_recall：  {}%"
+              .format(epoch_, self.config['epoch'], average_loss, average_mIOU * 100, average_accuracy * 100, average_precision * 100, average_recall * 100))
         print('------------------------------------------------------------------')
-        self.save(epoch_) if average_mIOU < self.best_pred else None
+        if average_mIOU > self.best_pred:
+            self.best_pred = average_mIOU
+            self.save(epoch_)
 
     def load(self):
         load_path = os.path.join(self.config["resume_path"], 'parameters.pth')
