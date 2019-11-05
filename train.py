@@ -5,7 +5,6 @@ import math
 import time
 import numpy as np
 import MinkowskiEngine as ME
-import model.pointnet as PointNet
 import model.res16unet as ResUNet
 from model.lr_scheduler import PolyLR
 from data import dataloader
@@ -24,7 +23,6 @@ class Trainer(object):
         self.loss_value = torch.tensor(0.0, requires_grad=True).to(self.device)
         self.point_number = self.config["point_num"]
         self.batch_size = self.config["batch_size"]
-        # self.model = PointNet.PointNet(self.config["class"])
         self.model = ResUNet.Res16UNet34C(3, self.config["class"])
         if self.config["fine_tune"]:
             model_dict = torch.load(os.path.join(config["resume_path"], 'weights_14.pth'), map_location=lambda storage, loc: storage.cuda(self.device))
@@ -40,16 +38,14 @@ class Trainer(object):
 
         self.loss = torch.nn.CrossEntropyLoss(ignore_index=self.config['ignore_label'])
 
-        self.train_data = dataloader(1, self.config["data_path"], voxel_size=self.config["voxel_size"], transform=False, shuffle=True)
+        self.train_data = dataloader(1, self.config["data_path"], voxel_size=self.config["voxel_size"], transformations=True, shuffle=True)
         self.val_data = dataloader(1, self.config["data_path"], data_type='val', voxel_size=config["voxel_size"])
 
-        # self.optimizer = torch.optim.SGD(self.model.parameters(), lr=self.config['lr'],
-        #                                  momentum=self.config['momentum'], weight_decay=self.config['weight_decay'])
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.config['lr'],
-                                          weight_decay=self.config['weight_decay'])
+        self.optimizer = torch.optim.SGD(self.model.parameters(), lr=self.config['lr'], momentum=self.config['momentum'], weight_decay=self.config['weight_decay'])
+        # self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.config['lr'], weight_decay=self.config['weight_decay'])
 
         # self.lr_scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=self.config['step_size'], gamma=0.1, last_epoch=-1)
-        self.lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, patience=3)
+        # self.lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, patience=3)
         self.lr_scheduler = PolyLR(self.optimizer, max_iter=self.config['epoch']*len(self.train_data), power=self.config['poly_power'], last_step=-1)
 
         log_path = os.path.join(config["log_path"], str(time.time()))
@@ -73,11 +69,15 @@ class Trainer(object):
                 self.loss_value /= (self.config["accumulate_gradient"]*self.batch_size)
                 self.loss_value.backward()
                 self.optimizer.step()
+                self.lr_scheduler.step()
                 self.optimizer.zero_grad()
                 self.summary.add_scalar('train/loss: ', self.loss_value, self.train_iter_number // self.batch_size)
                 print("train epoch:  {}/{}, ith:  {}/{}, loss:  {}".format(epoch_, self.config['epoch'], ith, len(self.train_data), self.loss_value.item()))
                 self.loss_value = 0
         average_loss = epoch_loss/len(self.train_data)
+        # # StepLR
+        # self.lr_scheduler.step(epoch_)
+
         # StepLR
         self.lr_scheduler.step(epoch_)
 
@@ -121,8 +121,8 @@ class Trainer(object):
         average_precision = precision_epoch / len(self.val_data)
         average_recall = recall_epoch / len(self.val_data)
 
-        # ReduceLROnPlateau
-        self.lr_scheduler.step(average_loss)
+        # # ReduceLROnPlateau
+        # self.lr_scheduler.step(average_loss)
 
         self.summary.add_scalar('val/loss_epoch', average_loss, epoch_)
         self.summary.add_scalar('val/mIOU_epoch', average_mIOU, epoch_)

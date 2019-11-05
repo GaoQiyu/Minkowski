@@ -55,7 +55,7 @@ import model.resunet as ResUNet
 #     39: (82., 84., 163.),
 #     40: (100., 85., 144.),
 # }
-CLASS_LABELS = ('wall', 'floor', 'stairs', 'beam', 'chair', 'sofa', 'table',
+CLASS_LABELS = ('wall', 'floor', 'beam', 'chair', 'sofa', 'table',
                 'door', 'window', 'bookcase', 'column', 'clutter', 'ceiling', 'board')
 VALID_CLASS_IDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
 
