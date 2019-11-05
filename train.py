@@ -6,7 +6,8 @@ import time
 import numpy as np
 import MinkowskiEngine as ME
 import model.pointnet as PointNet
-import model.resunet as ResUNet
+import model.res16unet as ResUNet
+from model.lr_scheduler import PolyLR
 from data import dataloader
 from model.evaluator import Evaluator
 from tensorboardX import SummaryWriter
@@ -24,7 +25,7 @@ class Trainer(object):
         self.point_number = self.config["point_num"]
         self.batch_size = self.config["batch_size"]
         # self.model = PointNet.PointNet(self.config["class"])
-        self.model = ResUNet.ResUNetIN14(3, self.config["class"])
+        self.model = ResUNet.Res16UNet34C(3, self.config["class"])
         if self.config["fine_tune"]:
             model_dict = torch.load(os.path.join(config["resume_path"], 'weights_14.pth'), map_location=lambda storage, loc: storage.cuda(self.device))
             self.model.load_state_dict(model_dict)
@@ -36,16 +37,20 @@ class Trainer(object):
                 lr=self.config["lr"] / 1e4, momentum=self.config["momentum"], weight_decay=1e-4)
         if self.config["use_cuda"]:
             self.model = self.model.to(self.device)
+
+        self.loss = torch.nn.CrossEntropyLoss(ignore_index=self.config['ignore_label'])
+
+        self.train_data = dataloader(1, self.config["data_path"], voxel_size=self.config["voxel_size"], transform=False, shuffle=True)
+        self.val_data = dataloader(1, self.config["data_path"], data_type='val', voxel_size=config["voxel_size"])
+
         # self.optimizer = torch.optim.SGD(self.model.parameters(), lr=self.config['lr'],
         #                                  momentum=self.config['momentum'], weight_decay=self.config['weight_decay'])
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.config['lr'],
                                           weight_decay=self.config['weight_decay'])
-        self.lr_scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=self.config['step_size'], gamma=0.1, last_epoch=-1)
-        # self.lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, patience=3)
-        self.loss = torch.nn.CrossEntropyLoss()
 
-        self.train_data = dataloader(1, self.config["data_path"], voxel_size=self.config["voxel_size"], transform=False, shuffle=True)
-        self.val_data = dataloader(1, self.config["data_path"], data_type='val', voxel_size=config["voxel_size"])
+        # self.lr_scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=self.config['step_size'], gamma=0.1, last_epoch=-1)
+        self.lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, patience=3)
+        self.lr_scheduler = PolyLR(self.optimizer, max_iter=self.config['epoch']*len(self.train_data), power=self.config['poly_power'], last_step=-1)
 
         log_path = os.path.join(config["log_path"], str(time.time()))
         os.mkdir(log_path) if not os.path.exists(log_path) else None
@@ -75,8 +80,7 @@ class Trainer(object):
         average_loss = epoch_loss/len(self.train_data)
         # StepLR
         self.lr_scheduler.step(epoch_)
-        # # ReduceLROnPlateau
-        # self.lr_scheduler.step(average_loss)
+
         self.summary.add_scalar('train/loss_epoch: ', average_loss, epoch_)
         print("epoch:    {}/{}, average_loss:    {}".format(epoch_, self.config['epoch'], average_loss))
         print('------------------------------------------------------------------')
@@ -116,6 +120,9 @@ class Trainer(object):
         average_accuracy = accuracy_epoch / len(self.val_data)
         average_precision = precision_epoch / len(self.val_data)
         average_recall = recall_epoch / len(self.val_data)
+
+        # ReduceLROnPlateau
+        self.lr_scheduler.step(average_loss)
 
         self.summary.add_scalar('val/loss_epoch', average_loss, epoch_)
         self.summary.add_scalar('val/mIOU_epoch', average_mIOU, epoch_)
@@ -167,6 +174,10 @@ class Trainer(object):
         if len(inds) > self.point_number:
             inds = np.random.choice(inds, self.point_number, replace=False)
         coordinates, features, labels = coords[inds], feats[inds], labels[inds]
+
+        # # For some networks, making the network invariant to even, odd coords is important
+        # coordinates[:, :3] += (torch.rand(3) * 100).type_as(coordinates)
+
         points = ME.SparseTensor(features, coordinates.int())
 
         if self.config["use_cuda"]:

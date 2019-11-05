@@ -6,9 +6,11 @@
 
   "lr": 0.1,
   "momentum": 0.9,
+  "poly_power": 0.9,
   "weight_decay": 1e-4,
   "batch_size": 8,
   "epoch": 10000,
+  "ignore_label": 255,
   "voxel_size": 0.05,
   "step_size": 20,
   "point_num": 60000,
