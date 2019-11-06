@@ -1,6 +1,7 @@
 {
   "fine_tune": false,
   "use_cuda": true,
+  "multi_gpu": true,
   "class": 13,
 
   "lr": 0.1,
@@ -10,9 +11,9 @@
   "batch_size": 8,
   "epoch": 10000,
   "ignore_label": 255,
-  "voxel_size": 0.01,
-  "point_num": 100000,
-  "accumulate_gradient": 1,
+  "voxel_size": 0.05,
+  "point_num": 50000,
+  "accumulate_gradient": 0.1,
 
   "return_transformation": false,
   "data_aug_color_trans_ratio": 0.1,
