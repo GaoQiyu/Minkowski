@@ -10,8 +10,8 @@
   "batch_size": 8,
   "epoch": 10000,
   "ignore_label": 255,
-  "voxel_size": 0.05,
-  "point_num": 60000,
+  "voxel_size": 0.01,
+  "point_num": 100000,
   "accumulate_gradient": 1,
 
   "return_transformation": false,

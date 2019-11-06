@@ -50,6 +50,8 @@ class Trainer(object):
             batch_size=1,
             limit_numpoints=False)
 
+        length = len(self.train_data)
+
         self.val_data = initialize_data_loader(
             S3DISDataset,
             config,
@@ -92,8 +94,9 @@ class Trainer(object):
                 self.summary.add_scalar('lr: ', lr_value, self.train_iter_number)
                 print("train epoch:  {}/{}, ith:  {}/{}, loss:  {}, lr:  {}".format(epoch_, self.config['epoch'], self.train_iter_number, len(self.train_data), self.loss_value.item(), lr_value))
                 self.loss_value = 0
+            if ith == len(self.train_data):
+                break
         average_loss = epoch_loss/len(self.train_data)
-
         self.summary.add_scalar('train/loss_epoch: ', average_loss, epoch_)
         print("epoch:    {}/{}, average_loss:    {}".format(epoch_, self.config['epoch'], average_loss))
         print('------------------------------------------------------------------')
@@ -175,7 +178,7 @@ class Trainer(object):
 
     def data_preprocess(self, data_dict):
         coords = data_dict[0]
-        feats = data_dict[1]
+        feats = data_dict[1]/256-0.5
         labels = data_dict[2]
         length = coords.shape[0]
 
