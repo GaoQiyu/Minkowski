@@ -4,12 +4,13 @@ import torch
 import math
 import time
 import numpy as np
+from tensorboardX import SummaryWriter
 import MinkowskiEngine as ME
 import model.res16unet as ResUNet
 from model.lr_scheduler import PolyLR
-from data import dataloader
 from model.evaluator import Evaluator
-from tensorboardX import SummaryWriter
+from data.dataset import initialize_data_loader
+from data.S3DIS import S3DISDataset
 
 
 class Trainer(object):
@@ -38,14 +39,29 @@ class Trainer(object):
 
         self.loss = torch.nn.CrossEntropyLoss(ignore_index=self.config['ignore_label'])
 
-        self.train_data = dataloader(1, self.config["data_path"], voxel_size=self.config["voxel_size"], transformations=True, shuffle=True)
-        self.val_data = dataloader(1, self.config["data_path"], data_type='val', voxel_size=config["voxel_size"])
+        self.train_data = initialize_data_loader(
+            S3DISDataset,
+            config,
+            phase='TRAIN',
+            threads=1,
+            augment_data=True,
+            shuffle=True,
+            repeat=True,
+            batch_size=1,
+            limit_numpoints=False)
 
+        self.val_data = initialize_data_loader(
+            S3DISDataset,
+            config,
+            threads=1,
+            phase='VAL',
+            augment_data=False,
+            shuffle=True,
+            repeat=False,
+            batch_size=1,
+            limit_numpoints=False)
         self.optimizer = torch.optim.SGD(self.model.parameters(), lr=self.config['lr'], momentum=self.config['momentum'], weight_decay=self.config['weight_decay'])
         # self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.config['lr'], weight_decay=self.config['weight_decay'])
-
-        # self.lr_scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=self.config['step_size'], gamma=0.1, last_epoch=-1)
-        # self.lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, patience=3)
         self.lr_scheduler = PolyLR(self.optimizer, max_iter=self.config['epoch']*len(self.train_data), power=self.config['poly_power'], last_step=-1)
 
         log_path = os.path.join(config["log_path"], str(time.time()))
@@ -68,18 +84,15 @@ class Trainer(object):
             if self.train_iter_number % self.batch_size == 0:
                 self.loss_value /= (self.config["accumulate_gradient"]*self.batch_size)
                 self.loss_value.backward()
+                lr_value = self.optimizer.state_dict()['param_groups'][0]['lr']
                 self.optimizer.step()
-                self.lr_scheduler.step()
+                self.lr_scheduler.step(self.train_iter_number)
                 self.optimizer.zero_grad()
-                self.summary.add_scalar('train/loss: ', self.loss_value, self.train_iter_number // self.batch_size)
-                print("train epoch:  {}/{}, ith:  {}/{}, loss:  {}".format(epoch_, self.config['epoch'], ith, len(self.train_data), self.loss_value.item()))
+                self.summary.add_scalar('train/loss: ', self.loss_value, self.train_iter_number)
+                self.summary.add_scalar('lr: ', lr_value, self.train_iter_number)
+                print("train epoch:  {}/{}, ith:  {}/{}, loss:  {}, lr:  {}".format(epoch_, self.config['epoch'], self.train_iter_number, len(self.train_data), self.loss_value.item(), lr_value))
                 self.loss_value = 0
         average_loss = epoch_loss/len(self.train_data)
-        # # StepLR
-        # self.lr_scheduler.step(epoch_)
-
-        # StepLR
-        self.lr_scheduler.step(epoch_)
 
         self.summary.add_scalar('train/loss_epoch: ', average_loss, epoch_)
         print("epoch:    {}/{}, average_loss:    {}".format(epoch_, self.config['epoch'], average_loss))
@@ -121,9 +134,6 @@ class Trainer(object):
         average_precision = precision_epoch / len(self.val_data)
         average_recall = recall_epoch / len(self.val_data)
 
-        # # ReduceLROnPlateau
-        # self.lr_scheduler.step(average_loss)
-
         self.summary.add_scalar('val/loss_epoch', average_loss, epoch_)
         self.summary.add_scalar('val/mIOU_epoch', average_mIOU, epoch_)
         self.summary.add_scalar('val/accuracy_epoch', average_accuracy, epoch_)
@@ -164,25 +174,23 @@ class Trainer(object):
                    os.path.join(self.config["resume_path"], 'parameters.pth'))
 
     def data_preprocess(self, data_dict):
-        coords = data_dict['coords']
-        feats = data_dict['feats']
-        labels = data_dict['labels']
+        coords = data_dict[0]
+        feats = data_dict[1]
+        labels = data_dict[2]
+        length = coords.shape[0]
 
-        coords[:, :3] = np.floor(coords[:, :3] / self.config['voxel_size'])
-        inds = ME.utils.sparse_quantize(coords[:, :3].numpy(), return_index=True)
+        if length > self.point_number:
+            inds = np.random.choice(np.arange(length), self.point_number, replace=False)
+            coords, feats, labels = coords[inds], feats[inds], labels[inds]
 
-        if len(inds) > self.point_number:
-            inds = np.random.choice(inds, self.point_number, replace=False)
-        coordinates, features, labels = coords[inds], feats[inds], labels[inds]
+        # For some networks, making the network invariant to even, odd coords is important
+        coords[:, :3] += (torch.rand(3) * 100).type_as(coords)
 
-        # # For some networks, making the network invariant to even, odd coords is important
-        # coordinates[:, :3] += (torch.rand(3) * 100).type_as(coordinates)
-
-        points = ME.SparseTensor(features, coordinates.int())
+        points = ME.SparseTensor(feats, coords.int())
 
         if self.config["use_cuda"]:
             points, labels = points.to(self.device), labels.to(self.device)
-        return points, labels
+        return points, labels.long()
 
 
 if __name__ == '__main__':
@@ -194,9 +202,6 @@ if __name__ == '__main__':
     trainer = Trainer(config)
     time_now = time.time()
     for epoch in range(trainer.epoch, config["epoch"]):
-        if config["multiple_fold"]:
-            trainer.train_data = dataloader(1, config["data_path"], fold=epoch%3, voxel_size=config["voxel_size"], transform=True, shuffle=True)
-            trainer.val_data = dataloader(1, config["data_path"], fold=epoch%3, data_type='val', voxel_size=config["voxel_size"])
         trainer.train(epoch)
         trainer.eval(epoch)
         print('one epoch time:   {} s'.format(time.time() - time_now))

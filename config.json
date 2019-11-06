@@ -1,7 +1,6 @@
 {
   "fine_tune": false,
   "use_cuda": true,
-  "multiple_fold": false,
   "class": 13,
 
   "lr": 0.1,
@@ -12,11 +11,17 @@
   "epoch": 10000,
   "ignore_label": 255,
   "voxel_size": 0.05,
-  "step_size": 20,
   "point_num": 60000,
-  "accumulate_gradient": 0.1,
+  "accumulate_gradient": 1,
 
-  "data_path": "/home/gaoqiyu/文档/Stanford3dDataset_v1.2_Aligned_Version/split",
+  "return_transformation": false,
+  "data_aug_color_trans_ratio": 0.1,
+  "data_aug_color_jitter_std": 0.05,
+  "data_aug_hue_max" : 0.5,
+  "data_aug_saturation_max": 0.5,
+  "cache_data": false,
+
+  "data_path": "/home/gaoqiyu/文档/Stanford3dDataset_v1.2_Aligned_Version/ply",
   "log_path": "/home/gaoqiyu/PycharmProjects/PointCloudSeg_Minkowski/log",
   "resume_path": "/home/gaoqiyu/PycharmProjects/PointCloudSeg_Minkowski/resume"
 }
