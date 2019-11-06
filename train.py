@@ -94,7 +94,7 @@ class Trainer(object):
                 self.summary.add_scalar('lr: ', lr_value, self.train_iter_number)
                 print("train epoch:  {}/{}, ith:  {}/{}, loss:  {}, lr:  {}".format(epoch_, self.config['epoch'], self.train_iter_number, len(self.train_data), self.loss_value.item(), lr_value))
                 self.loss_value = 0
-            if ith == len(self.train_data):
+            if ith == len(self.train_data)-1:
                 break
         average_loss = epoch_loss/len(self.train_data)
         self.summary.add_scalar('train/loss_epoch: ', average_loss, epoch_)
