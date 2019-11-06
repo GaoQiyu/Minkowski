@@ -4,23 +4,22 @@ import numpy as np
 from numpy.linalg import matrix_rank, inv
 from plyfile import PlyData, PlyElement
 import pandas as pd
-CLASS_LABELS = ('wall', 'floor', 'stairs', 'beam', 'chair', 'sofa', 'table', 'door', 'window', 'bookcase', 'column', 'clutter', 'ceiling', 'board')
+CLASS_LABELS = ('wall', 'floor', 'beam', 'chair', 'sofa', 'table', 'door', 'window', 'bookcase', 'column', 'clutter', 'ceiling', 'board')
 COLOR_MAP_RGB = {
     0: (0., 0., 0.),
     1: (227., 209., 212.),
     2: (143., 100., 21.),
-    3: (242., 171., 39.),
-    4: (100., 143., 156.),
-    5: (3., 3., 3.),
-    6: (255., 255., 0.),
-    7: (255., 0., 17.),
-    8: (45., 204., 193.),
-    9: (204., 45., 191.),
-    10: (85., 45., 204.),
-    11: (45., 204., 85.),
-    12: (81., 94., 51.),
-    13: (0., 9., 255.),
-    14: (122., 126., 240.)
+    3: (100., 143., 156.),
+    4: (3., 3., 3.),
+    5: (255., 255., 0.),
+    6: (255., 0., 17.),
+    7: (45., 204., 193.),
+    8: (204., 45., 191.),
+    9: (85., 45., 204.),
+    10: (45., 204., 85.),
+    11: (81., 94., 51.),
+    12: (0., 9., 255.),
+    13: (122., 126., 240.)
 }
 IGNORE_COLOR = (0, 0, 0)
 
@@ -61,8 +60,6 @@ def color2label():
             color=COLOR_MAP_RGB[12], fontsize=font)
     ax.text(0, 0.3, CLASS_LABELS[12], verticalalignment='top', horizontalalignment='left', transform=ax.transAxes,
             color=COLOR_MAP_RGB[13], fontsize=font)
-    ax.text(0.25, 0.3, CLASS_LABELS[13], verticalalignment='top', horizontalalignment='left', transform=ax.transAxes,
-            color=COLOR_MAP_RGB[14], fontsize=font)
 
     plt.axis('off')
     plt.savefig("./color2label.jpg")
@@ -380,3 +377,7 @@ class PlyWriter(object):
     subpointcloud = np.concatenate([xyz, label], axis=1)
     subpointcloud = np.array([tuple(l) for l in subpointcloud], dtype=cls.POINTCLOUD_DTYPE)
     return np.concatenate([target, subpointcloud], axis=0)
+
+
+if __name__ == '__main__':
+    color2label()
