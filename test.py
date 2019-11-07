@@ -30,30 +30,9 @@ SCANNET_COLOR_MAP = {
 }
 
 
-def load_file(file_name, voxel_size):
-    pcd = o3d.io.read_point_cloud(file_name)
-    coords = np.array(pcd.points)
-    feats = np.array(pcd.colors)
-
-    quantized_coords = np.floor(coords / voxel_size)
-    inds = ME.utils.sparse_quantize(quantized_coords)
-
-    return quantized_coords[inds], feats[inds], pcd
-
-
-def generate_input_sparse_tensor(file_name, voxel_size=0.05):
-    # Create a batch, this process is done in a data loader during training in parallel.
-    batch = [load_file(file_name, voxel_size)]
-    coordinates_, featrues_, pcds = list(zip(*batch))
-    coordinates, features = ME.utils.sparse_collate(coordinates_, featrues_)
-
-    # Normalize features and create a sparse tensor
-    return ME.SparseTensor(features - 0.5, coords=coordinates).to(device)
-
-
 def data_preprocess(data_dict):
     coords = data_dict[0]
-    feats = data_dict[1]
+    feats = data_dict[1] / 256 - 0.5
     labels = data_dict[2]
     length = coords.shape[0]
 
@@ -73,10 +52,12 @@ if __name__ == '__main__':
     with open(config_path) as config_file:
         config = json.load(config_file)
     config_file.close()
+    # voxel_size = config["val_voxel_size"]
+    voxel_size = 0.01
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # Define a model and load the weights
-    model = ResUNet.Res16UNet34C(3, 14).to(device)
+    model = ResUNet.Res16UNet34C(3, 13).to(device)
     model_dict = torch.load(os.path.join(config['resume_path'], 'parameters.pth'))["model"]
 
     model.load_state_dict(model_dict)
@@ -108,16 +89,16 @@ if __name__ == '__main__':
     # Create a point cloud file
     pred_pcd = o3d.geometry.PointCloud()
     coordinates = soutput.C.numpy()[:, :3]  # last column is the batch index
-    pred_pcd.points = o3d.utility.Vector3dVector(coordinates * config["voxel_size"])
+    pred_pcd.points = o3d.utility.Vector3dVector(coordinates * voxel_size)
     pred_pcd.colors = o3d.utility.Vector3dVector(colors_pred / 255)
 
     colors_ground = np.array([SCANNET_COLOR_MAP[VALID_CLASS_IDS[l]] for l in label])
     ground_pcd = o3d.geometry.PointCloud()
-    ground_pcd.points = o3d.utility.Vector3dVector(coordinates * config["voxel_size"] + np.array([0, 5, 0]))
+    ground_pcd.points = o3d.utility.Vector3dVector(coordinates * voxel_size + np.array([0, 2, 0]))
     ground_pcd.colors = o3d.utility.Vector3dVector(colors_ground / 255)
 
     color_pcd = o3d.geometry.PointCloud()
-    color_pcd.points = o3d.utility.Vector3dVector(data[0].numpy()[:, :3] * config["voxel_size"] + np.array([0, 5, 5]))
+    color_pcd.points = o3d.utility.Vector3dVector(data[0].numpy()[:, :3] * voxel_size + np.array([0, 2, 2]))
     color_pcd.colors = o3d.utility.Vector3dVector(data[1].numpy() / 255)
 
     o3d.visualization.draw_geometries([pred_pcd, ground_pcd, color_pcd])

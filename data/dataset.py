@@ -198,11 +198,11 @@ class VoxelizationDataset(VoxelizationDatasetBase):
                ignore_label=255,
                return_transformation=False,
                augment_data=False,
-               config=None,
+               voxel_size=0.02,
                **kwargs):
 
     self.augment_data = augment_data
-    self.config = config
+    # self.config = config
     VoxelizationDatasetBase.__init__(
         self,
         data_paths,
@@ -216,7 +216,7 @@ class VoxelizationDataset(VoxelizationDatasetBase):
 
     # Prevoxel transformations
     self.voxelizer = Voxelizer(
-        voxel_size=self.config["voxel_size"],
+        voxel_size=voxel_size,
         clip_bound=self.CLIP_BOUND,
         use_augmentation=augment_data,
         scale_augmentation_bound=self.SCALE_AUGMENTATION_BOUND,

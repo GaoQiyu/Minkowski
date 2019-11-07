@@ -27,8 +27,10 @@ class S3DISDataset(VoxelizationDataset):
     def __init__(self, config, prevoxel_transform=None, input_transform=None, target_transform=None, cache=False, augment_data=True, elastic_distortion=False, phase=DatasetPhase.Train):
         if phase == DatasetPhase.Train:
             data_root = os.path.join(config["data_path"], 'train')
+            voxel_size = config["train_voxel_size"]
         elif phase == DatasetPhase.Val:
             data_root = os.path.join(config["data_path"], 'val')
+            voxel_size = config["val_voxel_size"]
         VoxelizationDataset.__init__(
             self,
             os.listdir(data_root),
@@ -39,7 +41,7 @@ class S3DISDataset(VoxelizationDataset):
             return_transformation=config["return_transformation"],
             augment_data=augment_data,
             elastic_distortion=elastic_distortion,
-            config=config)
+            voxel_size=voxel_size)
 
 
 

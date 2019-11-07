@@ -80,7 +80,7 @@ class Trainer(object):
         epoch_loss = 0
         self.model.train()
         for ith, data_dict in enumerate(self.train_data):
-            point, labels = self.data_preprocess(data_dict)
+            point, labels = self.data_preprocess(data_dict, 'train')
             output_sparse = self.model(point)
             pred = output_sparse.F
             self.loss_value = self.loss(pred, labels) + self.loss_value
@@ -113,8 +113,7 @@ class Trainer(object):
         recall_epoch = 0
         epoch_loss = 0
         for ith, data_dict in enumerate(self.val_data):
-            point, labels = self.data_preprocess(data_dict)
-
+            point, labels = self.data_preprocess(data_dict, 'val')
             with torch.no_grad():
                 output = self.model(point)
             pred = output.F
@@ -180,18 +179,19 @@ class Trainer(object):
                     'loss_value': self.loss_value},
                    os.path.join(self.config["resume_path"], 'parameters.pth'))
 
-    def data_preprocess(self, data_dict):
+    def data_preprocess(self, data_dict, data_type='train'):
         coords = data_dict[0]
         feats = data_dict[1]/256-0.5
         labels = data_dict[2]
         length = coords.shape[0]
 
-        if length > self.point_number:
+        if length > self.point_number and data_type == 'train':
             inds = np.random.choice(np.arange(length), self.point_number, replace=False)
             coords, feats, labels = coords[inds], feats[inds], labels[inds]
 
-        # For some networks, making the network invariant to even, odd coords is important
-        coords[:, :3] += (torch.rand(3) * 100).type_as(coords)
+        if data_type == 'train':
+            # For some networks, making the network invariant to even, odd coords is important
+            coords[:, :3] += (torch.rand(3) * 100).type_as(coords)
 
         points = ME.SparseTensor(feats, coords.int())
 
