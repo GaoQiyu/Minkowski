@@ -15,7 +15,6 @@ class S3DISDataset(VoxelizationDataset):
     CLIP_BOUND = None
     TEST_CLIP_BOUND = None
     CLIP_BOUND = None
-    VOXEL_SIZE = 5  # 5cm
     IGNORE_LABELS = []  # remove stairs, following SegCloud
 
     # Augmentation arguments
@@ -25,6 +24,7 @@ class S3DISDataset(VoxelizationDataset):
     TRANSLATION_AUGMENTATION_RATIO_BOUND = ((-0.2, 0.2), (-0.2, 0.2), (-0.05, 0.05))
 
     def __init__(self, config, prevoxel_transform=None, input_transform=None, target_transform=None, cache=False, augment_data=True, elastic_distortion=False, phase=DatasetPhase.Train):
+        voxel_size = 0.02
         if phase == DatasetPhase.Train:
             data_root = os.path.join(config["data_path"], 'train')
             voxel_size = config["train_voxel_size"]

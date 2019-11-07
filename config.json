@@ -2,19 +2,19 @@
   "fine_tune": false,
   "use_cuda": true,
   "multi_gpu": false,
-  "class": 13,
+  "class": 4,
 
-  "lr": 0.01,
+  "lr": 0.1,
   "momentum": 0.9,
   "poly_power": 0.9,
   "weight_decay": 1e-4,
-  "batch_size": 8,
+  "batch_size": 16,
   "epoch": 10000,
   "ignore_label": 255,
-  "train_voxel_size": 0.06,
-  "val_voxel_size": 0.02,
+  "train_voxel_size": 0.001,
+  "val_voxel_size": 0.001,
   "point_num": 50000,
-  "accumulate_gradient": 1,
+  "accumulate_gradient": 0.1,
 
   "return_transformation": false,
   "data_aug_color_trans_ratio": 0.1,
@@ -23,7 +23,7 @@
   "data_aug_saturation_max": 0.5,
   "cache_data": false,
 
-  "data_path": "/home/gaoqiyu/文档/Stanford3dDataset_v1.2_Aligned_Version/ply",
+  "data_path": "/home/gaoqiyu/文档/shapenet",
   "log_path": "/home/gaoqiyu/PycharmProjects/PointCloudSeg_Minkowski/log",
   "resume_path": "/home/gaoqiyu/PycharmProjects/PointCloudSeg_Minkowski/resume"
 }

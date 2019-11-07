@@ -63,7 +63,7 @@ def shapenet(path):
                 assert len(data) == len(label)
                 if len(data) != len(label):
                     print(os.path.join(data_path, cat, data_files[ith]))
-                point = np.concatenate([np.array(data).astype(np.float), np.array(label).astype(np.int).reshape(-1, 1)], axis=1)
+                point = np.concatenate([np.array(data).astype(np.float), np.array(label).astype(np.int).reshape(-1, 1)-1], axis=1)
                 save_path = os.path.join(ply_path, cat + '_' + data_files[ith].split('.')[0]) + ".ply"
                 save_point_cloud(point, save_path, with_label=True)
 

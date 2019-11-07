@@ -10,6 +10,7 @@ from model.lr_scheduler import PolyLR
 from model.evaluator import Evaluator
 from data.dataset import initialize_data_loader
 from data.S3DIS import S3DISDataset
+from data.shapenet import ShapeNet
 
 
 class Trainer(object):
@@ -45,7 +46,7 @@ class Trainer(object):
         self.loss = torch.nn.CrossEntropyLoss(ignore_index=self.config['ignore_label'])
 
         self.train_data = initialize_data_loader(
-            S3DISDataset,
+            ShapeNet,
             self.config,
             phase='TRAIN',
             threads=1,
@@ -56,7 +57,7 @@ class Trainer(object):
             limit_numpoints=False)
 
         self.val_data = initialize_data_loader(
-            S3DISDataset,
+            ShapeNet,
             self.config,
             threads=1,
             phase='VAL',
