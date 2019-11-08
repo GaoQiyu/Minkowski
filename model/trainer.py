@@ -78,7 +78,7 @@ class Trainer(object):
                 torch.cuda.empty_cache()
                 self.summary.add_scalar('train/loss: ', self.loss_value, self.train_iter_number)
                 self.summary.add_scalar('train/lr: ', lr_value, self.train_iter_number)
-                print("train epoch:  {}/{}, ith:  {}/{}, loss:  {:.4f}, lr:  {:.4f}".format(epoch_, self.config['epoch'], self.train_iter_number, len(self.train_data), self.loss_value.item(), lr_value))
+                print("train epoch:  {}/{}, ith:  {}/{}, loss:  {:.4f}, lr:  {:.6f}".format(epoch_, self.config['epoch'], self.train_iter_number, len(self.train_data), self.loss_value.item(), lr_value))
                 self.loss_value = 0
             if ith == len(self.train_data)-1:
                 break
@@ -116,7 +116,7 @@ class Trainer(object):
             self.summary.add_scalar('val/loss: ', loss_eval, self.val_iter_number)
 
             print("val epoch:  {}/{}, ith:  {}/{}, loss：  {:.4f}, mIOU:  {:.2%}, accuracy  {:.2%}，precision  {:.2%}，recall  {:.2%}"
-                  .format(epoch_, self.config['epoch'], ith, len(self.val_data), loss_eval, mIOU*100, accuracy*100, precision*100, recall*100))
+                  .format(epoch_, self.config['epoch'], ith, len(self.val_data), loss_eval, mIOU, accuracy, precision, recall))
         average_loss = epoch_loss / len(self.val_data)
         average_mIOU = mIOU_epoch/len(self.val_data)
         average_accuracy = accuracy_epoch / len(self.val_data)
@@ -130,7 +130,7 @@ class Trainer(object):
         self.summary.add_scalar('val/recall_epoch', average_recall, epoch_)
 
         print("epoch:  {}/{}, average_loss： {:.4f}，average_mIOU:  {:.2%}, average_accuracy：  {:.2%}, average_precision：  {:.2%}, average_recall：  {:.2%}"
-              .format(epoch_, self.config['epoch'], average_loss, average_mIOU * 100, average_accuracy * 100, average_precision * 100, average_recall * 100))
+              .format(epoch_, self.config['epoch'], average_loss, average_mIOU, average_accuracy, average_precision, average_recall))
         print('------------------------------------------------------------------')
         if average_mIOU > self.best_pred:
             self.best_pred = average_mIOU
