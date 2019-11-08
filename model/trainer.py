@@ -50,7 +50,7 @@ class Trainer(object):
         self.optimizer = torch.optim.SGD(self.model.parameters(), lr=self.config['lr'], momentum=self.config['momentum'], weight_decay=self.config['weight_decay'])
         # self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.config['lr'], weight_decay=self.config['weight_decay'])
         self.lr_scheduler = PolyLR(self.optimizer, max_iter=60000, power=self.config['poly_power'], last_step=-1)
-        self.lr_scheduler.step(self.train_iter_number)
+
         log_path = os.path.join(self.config["log_path"], str(time.time()))
         os.mkdir(log_path) if not os.path.exists(log_path) else None
         self.summary = SummaryWriter(log_path)
@@ -75,15 +75,16 @@ class Trainer(object):
                 self.optimizer.step()
                 self.lr_scheduler.step(self.train_iter_number)
                 self.optimizer.zero_grad()
+                torch.cuda.empty_cache()
                 self.summary.add_scalar('train/loss: ', self.loss_value, self.train_iter_number)
-                self.summary.add_scalar('lr: ', lr_value, self.train_iter_number)
-                print("train epoch:  {}/{}, ith:  {}/{}, loss:  {}, lr:  {}".format(epoch_, self.config['epoch'], self.train_iter_number, len(self.train_data), self.loss_value.item(), lr_value))
+                self.summary.add_scalar('train/lr: ', lr_value, self.train_iter_number)
+                print("train epoch:  {}/{}, ith:  {}/{}, loss:  {:.4f}, lr:  {:.4f}".format(epoch_, self.config['epoch'], self.train_iter_number, len(self.train_data), self.loss_value.item(), lr_value))
                 self.loss_value = 0
             if ith == len(self.train_data)-1:
                 break
         average_loss = epoch_loss/len(self.train_data)
         self.summary.add_scalar('train/loss_epoch: ', average_loss, epoch_)
-        print("epoch:    {}/{}, average_loss:    {}".format(epoch_, self.config['epoch'], average_loss))
+        print("epoch:    {}/{}, average_loss:    {:.4f}".format(epoch_, self.config['epoch'], average_loss))
         print('------------------------------------------------------------------')
 
     def eval(self, epoch_):
@@ -114,7 +115,7 @@ class Trainer(object):
             self.summary.add_scalar('val/recall', recall, self.val_iter_number)
             self.summary.add_scalar('val/loss: ', loss_eval, self.val_iter_number)
 
-            print("val epoch:  {}/{}, ith:  {}/{}, loss：  {}, mIOU:  {}%, accuracy  {}%，precision  {}%，recall  {}%"
+            print("val epoch:  {}/{}, ith:  {}/{}, loss：  {:.4f}, mIOU:  {:.2%}, accuracy  {:.2%}，precision  {:.2%}，recall  {:.2%}"
                   .format(epoch_, self.config['epoch'], ith, len(self.val_data), loss_eval, mIOU*100, accuracy*100, precision*100, recall*100))
         average_loss = epoch_loss / len(self.val_data)
         average_mIOU = mIOU_epoch/len(self.val_data)
@@ -128,7 +129,7 @@ class Trainer(object):
         self.summary.add_scalar('val/precision_epoch', average_precision, epoch_)
         self.summary.add_scalar('val/recall_epoch', average_recall, epoch_)
 
-        print("epoch:  {}/{}, average_loss： {}，average_mIOU:  {}%, average_accuracy：  {}%, average_precision：  {}%, average_recall：  {}%"
+        print("epoch:  {}/{}, average_loss： {:.4f}，average_mIOU:  {:.2%}, average_accuracy：  {:.2%}, average_precision：  {:.2%}, average_recall：  {:.2%}"
               .format(epoch_, self.config['epoch'], average_loss, average_mIOU * 100, average_accuracy * 100, average_precision * 100, average_recall * 100))
         print('------------------------------------------------------------------')
         if average_mIOU > self.best_pred:
@@ -148,6 +149,7 @@ class Trainer(object):
             self.val_iter_number = load_parameters['val_iter_number']
             self.loss_value = load_parameters['loss_value']
             self.model = self.model.to(self.device)
+            self.lr_scheduler.step(self.train_iter_number)
 
     def save(self, epoch_):
         os.mkdir(self.config["resume_path"]) if not os.path.exists(self.config["resume_path"]) else None
