@@ -44,31 +44,13 @@ class Trainer(object):
 
         self.loss = torch.nn.CrossEntropyLoss(ignore_index=self.config['ignore_label'])
 
-        self.train_data = initialize_data_loader(
-            S3DISDataset,
-            self.config,
-            phase='TRAIN',
-            threads=1,
-            augment_data=True,
-            shuffle=True,
-            repeat=True,
-            batch_size=1,
-            limit_numpoints=False)
+        self.train_data = initialize_data_loader(S3DISDataset, self.config, phase='TRAIN', threads=1, augment_data=True, shuffle=True, repeat=True, batch_size=1, limit_numpoints=False)
+        self.val_data = initialize_data_loader(S3DISDataset, self.config, threads=1, phase='VAL', augment_data=False, shuffle=True, repeat=False, batch_size=1, limit_numpoints=False)
 
-        self.val_data = initialize_data_loader(
-            S3DISDataset,
-            self.config,
-            threads=1,
-            phase='VAL',
-            augment_data=False,
-            shuffle=True,
-            repeat=False,
-            batch_size=1,
-            limit_numpoints=False)
         self.optimizer = torch.optim.SGD(self.model.parameters(), lr=self.config['lr'], momentum=self.config['momentum'], weight_decay=self.config['weight_decay'])
         # self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.config['lr'], weight_decay=self.config['weight_decay'])
-        self.lr_scheduler = PolyLR(self.optimizer, max_iter=self.config['epoch']*len(self.train_data), power=self.config['poly_power'], last_step=-1)
-
+        self.lr_scheduler = PolyLR(self.optimizer, max_iter=60000, power=self.config['poly_power'], last_step=-1)
+        self.lr_scheduler.step(self.train_iter_number)
         log_path = os.path.join(self.config["log_path"], str(time.time()))
         os.mkdir(log_path) if not os.path.exists(log_path) else None
         self.summary = SummaryWriter(log_path)
@@ -181,7 +163,7 @@ class Trainer(object):
 
     def data_preprocess(self, data_dict, data_type='train'):
         coords = data_dict[0]
-        feats = data_dict[1]/256-0.5
+        feats = data_dict[1]/255-0.5
         labels = data_dict[2]
         length = coords.shape[0]
 

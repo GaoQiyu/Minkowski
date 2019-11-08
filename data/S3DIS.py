@@ -19,8 +19,8 @@ class S3DISDataset(VoxelizationDataset):
 
     # Augmentation arguments
     ELASTIC_DISTORT_PARAMS = ((20, 100), (80, 320))
-    ROTATION_AUGMENTATION_BOUND = ((-np.pi / 32, np.pi / 32), (-np.pi / 32, np.pi / 32), (-np.pi,
-                                                                                          np.pi))
+    ROTATION_AUGMENTATION_BOUND = ((-np.pi / 32, np.pi / 32), (-np.pi / 32, np.pi / 32), (-np.pi, np.pi))
+    SCALE_AUGMENTATION_BOUND = (0.8, 1.2)
     TRANSLATION_AUGMENTATION_RATIO_BOUND = ((-0.2, 0.2), (-0.2, 0.2), (-0.05, 0.05))
 
     def __init__(self, config, prevoxel_transform=None, input_transform=None, target_transform=None, cache=False, augment_data=True, elastic_distortion=False, phase=DatasetPhase.Train):

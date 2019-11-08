@@ -7,9 +7,10 @@ import MinkowskiEngine as ME
 from data.dataset import Voxelizer
 from data.utils import read_plyfile
 import model.res16unet as ResUNet
+from model.evaluator import Evaluator
 CLASS_LABELS = ('wall', 'floor', 'beam', 'chair', 'sofa', 'table',
                 'door', 'window', 'bookcase', 'column', 'clutter', 'ceiling', 'board')
-VALID_CLASS_IDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
+VALID_CLASS_IDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
 
 SCANNET_COLOR_MAP = {
     0: (0., 0., 0.),
@@ -25,8 +26,7 @@ SCANNET_COLOR_MAP = {
     10: (85., 45., 204.),
     11: (45., 204., 85.),
     12: (81., 94., 51.),
-    13: (0., 9., 255.),
-    14: (122., 126., 240.)
+    13: (0., 9., 255.)
 }
 
 
@@ -39,8 +39,8 @@ def data_preprocess(data_dict, voxel_size):
         voxel_size=voxel_size,
         clip_bound=None,
         use_augmentation=False,
-        scale_augmentation_bound=(0.9, 1.1),
-        rotation_augmentation_bound=((-np.pi / 64, np.pi / 64), (-np.pi / 64, np.pi / 64), (-np.pi, np.pi)),
+        scale_augmentation_bound=(1, 1),
+        rotation_augmentation_bound=(0, 0, 0),
         translation_augmentation_ratio_bound=((-0, 0), (-0, 0), (-0.0, 0.0)),
         ignore_label=255)
     coords, feats, labels, _ = voxelizer.voxelize(coords, feats, label)
@@ -49,7 +49,7 @@ def data_preprocess(data_dict, voxel_size):
 
     if config["use_cuda"]:
         points = points.to(device)
-    return points, coords, feats, labels
+    return points, coords, feats, labels.astype(np.long)
 
 
 if __name__ == '__main__':
@@ -58,15 +58,17 @@ if __name__ == '__main__':
         config = json.load(config_file)
     config_file.close()
     voxel_size = config["val_voxel_size"]
+    num_class = config["class"]
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # Define a model and load the weights
-    model = ResUNet.Res16UNet34C(3, 13).to(device)
+    model = ResUNet.Res16UNet34C(3, num_class).to(device)
+    evaluator = Evaluator(num_class)
     model_dict = torch.load(os.path.join(config['resume_path'], 'parameters.pth'))["model"]
     model.load_state_dict(model_dict)
     model.eval()
 
-    test_data = read_plyfile("/home/gaoqiyu/文档/shapenet/val/02691156_013517.ply")
+    test_data = read_plyfile("/home/gaoqiyu/文档/Stanford3dDataset_v1.2_Aligned_Version/ply/val/Area_5_office_23.ply")
     sinput, coords, feats, labels = data_preprocess(test_data, voxel_size)
 
     soutput = model(sinput.to(device))
@@ -75,6 +77,8 @@ if __name__ == '__main__':
     _, pred = soutput.F.max(1)
     pred = pred.cpu().numpy()
 
+    evaluator.generate(pred, labels)
+    print("mIOU:  ", evaluator.mIOU())
     # Map color
     colors_pred = np.array([SCANNET_COLOR_MAP[VALID_CLASS_IDS[l]] for l in pred])
     # Create a point cloud file
@@ -85,11 +89,7 @@ if __name__ == '__main__':
 
     colors_ground = np.array([SCANNET_COLOR_MAP[VALID_CLASS_IDS[l]] for l in labels])
     ground_pcd = o3d.geometry.PointCloud()
-    ground_pcd.points = o3d.utility.Vector3dVector(coordinates * voxel_size + np.array([0, 2, 0]))
+    ground_pcd.points = o3d.utility.Vector3dVector(coordinates * voxel_size + np.array([0, 10, 0]))
     ground_pcd.colors = o3d.utility.Vector3dVector(colors_ground / 255)
 
-    color_pcd = o3d.geometry.PointCloud()
-    color_pcd.points = o3d.utility.Vector3dVector(test_data[:, :3] + np.array([0, 2, 2]))
-    color_pcd.colors = o3d.utility.Vector3dVector(test_data[:, 3:6] / 255)
-
-    o3d.visualization.draw_geometries([pred_pcd, ground_pcd, color_pcd])
+    o3d.visualization.draw_geometries([pred_pcd, ground_pcd])
