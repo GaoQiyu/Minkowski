@@ -7,14 +7,14 @@ class Evaluator(object):
         self.num_class = num_class
         self.matrix = np.zeros((self.num_class, )*2)
 
-    def accuracy(self):
+    def Accuracy(self):
         Acc = np.diag(self.matrix).sum() / self.matrix.sum()
         return Acc
 
-    def accuracy_class(self):
+    def mAccuracy(self):
         Acc = np.diag(self.matrix) / self.matrix.sum(axis=1)
-        Acc = np.nanmean(Acc)
-        return Acc
+        mAcc = np.nanmean(Acc)
+        return Acc, mAcc
 
     def precision(self):
         precision = np.diag(self.matrix) / self.matrix.sum(axis=1)
@@ -29,12 +29,16 @@ class Evaluator(object):
     def mIOU(self):
         IoU = np.diag(self.matrix) / (np.sum(self.matrix, axis=1) + np.sum(self.matrix, axis=0) - np.diag(self.matrix) + 1e-20)
         mIoU = np.nanmean(IoU)
-        return mIoU
+        return IoU, mIoU
 
     def generate(self, pred, label):
         tmp = pred * self.num_class + label
         self.matrix = np.bincount(tmp, minlength=self.num_class ** 2).reshape((self.num_class, self.num_class))
-        return self.mIOU(), self.accuracy_class(), self.precision(), self.recall()
+        _, mIOU = self.mIOU()
+        _, mAcc = self.mAccuracy()
+        precision = self.precision()
+        recall = self.recall()
+        return mIOU, mAcc, precision, recall
 
 
 if __name__ == '__main__':

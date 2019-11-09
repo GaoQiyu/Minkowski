@@ -19,6 +19,8 @@ class Trainer(object):
         self.train_iter_number = 0
         self.val_iter_number = 0
         self.epoch = 0
+        self.class_name = self.config["class_label"]
+        loss_weight = torch.tensor(self.config["loss_weight"])
         if self.config["multi_gpu"]:
             self.device_list = list(range(torch.cuda.device_count()))
             self.device = self.device_list[0]
@@ -39,10 +41,11 @@ class Trainer(object):
                 lr=self.config["lr"] / 1e4, momentum=self.config["momentum"], weight_decay=1e-4)
         if self.config["use_cuda"]:
             self.model = self.model.to(self.device)
+            loss_weight = loss_weight.to(self.device)
         if self.config["multi_gpu"]:
             self.model = torch.nn.DataParallel(self.model, device_ids=self.device_list)
 
-        self.loss = torch.nn.CrossEntropyLoss(ignore_index=self.config['ignore_label'])
+        self.loss = torch.nn.CrossEntropyLoss(weight=loss_weight.float(), ignore_index=self.config['ignore_label'])
 
         self.train_data = initialize_data_loader(S3DISDataset, self.config, phase='TRAIN', threads=1, augment_data=True, shuffle=True, repeat=True, batch_size=1, limit_numpoints=False)
         self.val_data = initialize_data_loader(S3DISDataset, self.config, threads=1, phase='VAL', augment_data=False, shuffle=True, repeat=False, batch_size=1, limit_numpoints=False)
@@ -90,8 +93,10 @@ class Trainer(object):
     def eval(self, epoch_):
         self.model.eval()
         torch.cuda.empty_cache()
+        IOU_epoch = 0
         mIOU_epoch = 0
-        accuracy_epoch = 0
+        Acc_epoch = 0
+        mAcc_epoch = 0
         precision_epoch = 0
         recall_epoch = 0
         epoch_loss = 0
@@ -103,8 +108,13 @@ class Trainer(object):
             loss_eval = self.loss(pred, labels) / self.config["accumulate_gradient"]
             epoch_loss += loss_eval.item()
             mIOU, accuracy, precision, recall = self.evaluator.generate(pred.max(1)[1].cpu(), labels.cpu())
+            IOU, _ = self.evaluator.mIOU()
+            Acc, _ = self.evaluator.mAccuracy()
+
+            IOU_epoch += IOU
             mIOU_epoch += mIOU
-            accuracy_epoch += accuracy
+            Acc_epoch += Acc
+            mAcc_epoch += accuracy
             precision_epoch += precision
             recall_epoch += recall
 
@@ -118,19 +128,24 @@ class Trainer(object):
             print("val epoch:  {}/{}, ith:  {}/{}, loss：  {:.4f}, mIOU:  {:.2%}, accuracy  {:.2%}，precision  {:.2%}，recall  {:.2%}"
                   .format(epoch_, self.config['epoch'], ith, len(self.val_data), loss_eval, mIOU, accuracy, precision, recall))
         average_loss = epoch_loss / len(self.val_data)
+        average_IOU = IOU_epoch / len(self.val_data)
         average_mIOU = mIOU_epoch/len(self.val_data)
-        average_accuracy = accuracy_epoch / len(self.val_data)
+        average_Acc = Acc_epoch / len(self.val_data)
+        average_mAcc = mAcc_epoch / len(self.val_data)
         average_precision = precision_epoch / len(self.val_data)
         average_recall = recall_epoch / len(self.val_data)
 
         self.summary.add_scalar('val/loss_epoch', average_loss, epoch_)
         self.summary.add_scalar('val/mIOU_epoch', average_mIOU, epoch_)
-        self.summary.add_scalar('val/accuracy_epoch', average_accuracy, epoch_)
+        self.summary.add_scalar('val/accuracy_epoch', average_mAcc, epoch_)
         self.summary.add_scalar('val/precision_epoch', average_precision, epoch_)
         self.summary.add_scalar('val/recall_epoch', average_recall, epoch_)
 
         print("epoch:  {}/{}, average_loss： {:.4f}，average_mIOU:  {:.2%}, average_accuracy：  {:.2%}, average_precision：  {:.2%}, average_recall：  {:.2%}"
-              .format(epoch_, self.config['epoch'], average_loss, average_mIOU, average_accuracy, average_precision, average_recall))
+              .format(epoch_, self.config['epoch'], average_loss, average_mIOU, average_mAcc, average_precision, average_recall))
+        print("class name  ", self.class_name)
+        print("IOU/class:  ", average_IOU)
+        print("acc/class:  ", average_Acc)
         print('------------------------------------------------------------------')
         if average_mIOU > self.best_pred:
             self.best_pred = average_mIOU

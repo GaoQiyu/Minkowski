@@ -16,17 +16,17 @@ SCANNET_COLOR_MAP = {
     0: (0., 0., 0.),
     1: (227., 209., 212.),
     2: (143., 100., 21.),
-    3: (242., 171., 39.),
-    4: (100., 143., 156.),
-    5: (3., 3., 3.),
-    6: (255., 255., 0.),
-    7: (255., 0., 17.),
-    8: (45., 204., 193.),
-    9: (204., 45., 191.),
-    10: (85., 45., 204.),
-    11: (45., 204., 85.),
-    12: (81., 94., 51.),
-    13: (0., 9., 255.)
+    3: (100., 143., 156.),
+    4: (3., 3., 3.),
+    5: (255., 255., 0.),
+    6: (255., 0., 17.),
+    7: (45., 204., 193.),
+    8: (204., 45., 191.),
+    9: (85., 45., 204.),
+    10: (45., 204., 85.),
+    11: (81., 94., 51.),
+    12: (0., 9., 255.),
+    13: (122., 126., 240.)
 }
 
 
@@ -68,7 +68,7 @@ if __name__ == '__main__':
     model.load_state_dict(model_dict)
     model.eval()
 
-    test_data = read_plyfile("/home/gaoqiyu/文档/Stanford3dDataset_v1.2_Aligned_Version/ply(复件)/val/Area_5_office_10.ply")
+    test_data = read_plyfile("/home/gaoqiyu/文档/Stanford3dDataset_v1.2_Aligned_Version/ply(复件)/val/Area_5_office_22.ply")
     sinput, coords, feats, labels = data_preprocess(test_data, voxel_size)
 
     soutput = model(sinput.to(device))
@@ -80,10 +80,10 @@ if __name__ == '__main__':
     evaluator.generate(pred, labels)
     print("mIOU:  ", evaluator.mIOU())
     # Map color
-    colors_pred = np.array([SCANNET_COLOR_MAP[VALID_CLASS_IDS[l]] for l in pred])
-    # Create a point cloud file
     pred_pcd = o3d.geometry.PointCloud()
-    coordinates = soutput.C.numpy()[:, :3]  # last column is the batch index
+    coordinates = soutput.C.numpy()[:, :3]  # last c
+    colors_pred = np.array([SCANNET_COLOR_MAP[VALID_CLASS_IDS[l]] for l in pred])
+    # Create a point cloud fileolumn is the batch index
     pred_pcd.points = o3d.utility.Vector3dVector(coordinates * voxel_size)
     pred_pcd.colors = o3d.utility.Vector3dVector(colors_pred / 255)
 
