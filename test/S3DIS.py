@@ -68,7 +68,7 @@ if __name__ == '__main__':
     model.load_state_dict(model_dict)
     model.eval()
 
-    test_data = read_plyfile("/home/gaoqiyu/文档/Stanford3dDataset_v1.2_Aligned_Version/ply(复件)/val/Area_5_office_22.ply")
+    test_data = read_plyfile("/home/gaoqiyu/文档/Stanford3dDataset_v1.2_Aligned_Version/ply(复件)/val/Area_5_office_.ply")
     sinput, coords, feats, labels = data_preprocess(test_data, voxel_size)
 
     soutput = model(sinput.to(device))
@@ -78,7 +78,9 @@ if __name__ == '__main__':
     pred = pred.cpu().numpy()
 
     evaluator.generate(pred, labels)
-    print("mIOU:  ", evaluator.mIOU())
+    IOU, mIOU = evaluator.mIOU()
+    print("IOU:  ", IOU)
+    print("mIOU:  ", mIOU)
     # Map color
     pred_pcd = o3d.geometry.PointCloud()
     coordinates = soutput.C.numpy()[:, :3]  # last c
@@ -92,4 +94,5 @@ if __name__ == '__main__':
     ground_pcd.points = o3d.utility.Vector3dVector(coordinates * voxel_size + np.array([0, 10, 0]))
     ground_pcd.colors = o3d.utility.Vector3dVector(colors_ground / 255)
 
-    o3d.visualization.draw_geometries([pred_pcd, ground_pcd])
+    # o3d.visualization.draw_geometries([pred_pcd, ground_pcd])
+    o3d.visualization.draw_geometries([pred_pcd])

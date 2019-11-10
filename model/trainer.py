@@ -62,14 +62,14 @@ class Trainer(object):
         self.load()
 
     def train(self, epoch_):
-        epoch_loss = 0
+        epoch_loss = []
         self.model.train()
         for ith, data_dict in enumerate(self.train_data):
             point, labels = self.data_preprocess(data_dict, 'train')
             output_sparse = self.model(point)
             pred = output_sparse.F
             self.loss_value = self.loss(pred, labels) + self.loss_value
-            epoch_loss += self.loss(pred, labels).item() / self.config["accumulate_gradient"]
+            epoch_loss.append(self.loss(pred, labels).item() / self.config["accumulate_gradient"])
             self.train_iter_number += 1
             if self.train_iter_number % self.batch_size == 0:
                 self.loss_value /= (self.config["accumulate_gradient"]*self.batch_size)
@@ -85,7 +85,7 @@ class Trainer(object):
                 self.loss_value = 0
             if ith == len(self.train_data)-1:
                 break
-        average_loss = epoch_loss/len(self.train_data)
+        average_loss = np.nanmean(epoch_loss)
         self.summary.add_scalar('train/loss_epoch: ', average_loss, epoch_)
         print("epoch:    {}/{}, average_loss:    {:.4f}".format(epoch_, self.config['epoch'], average_loss))
         print('------------------------------------------------------------------')
@@ -93,59 +93,53 @@ class Trainer(object):
     def eval(self, epoch_):
         self.model.eval()
         torch.cuda.empty_cache()
-        IOU_epoch = 0
-        mIOU_epoch = 0
-        Acc_epoch = 0
-        mAcc_epoch = 0
-        precision_epoch = 0
-        recall_epoch = 0
-        epoch_loss = 0
+        IOU_epoch = []
+        mIOU_epoch = []
+        Acc_epoch = []
+        precision_epoch = []
+        recall_epoch = []
+        epoch_loss = []
         for ith, data_dict in enumerate(self.val_data):
             point, labels = self.data_preprocess(data_dict, 'val')
             with torch.no_grad():
                 output = self.model(point)
             pred = output.F
             loss_eval = self.loss(pred, labels) / self.config["accumulate_gradient"]
-            epoch_loss += loss_eval.item()
-            mIOU, accuracy, precision, recall = self.evaluator.generate(pred.max(1)[1].cpu(), labels.cpu())
+            epoch_loss.append(loss_eval.item())
+            mIOU, Acc, precision, recall = self.evaluator.generate(pred.max(1)[1].cpu(), labels.cpu())
             IOU, _ = self.evaluator.mIOU()
-            Acc, _ = self.evaluator.mAccuracy()
 
-            IOU_epoch += IOU
-            mIOU_epoch += mIOU
-            Acc_epoch += Acc
-            mAcc_epoch += accuracy
-            precision_epoch += precision
-            recall_epoch += recall
+            IOU_epoch.append(IOU)
+            mIOU_epoch.append(mIOU)
+            Acc_epoch.append(Acc)
+            precision_epoch.append(precision)
+            recall_epoch.append(recall)
 
             self.val_iter_number += 1
             self.summary.add_scalar('val/mIOU', mIOU, self.val_iter_number)
-            self.summary.add_scalar('val/accuracy', accuracy, self.val_iter_number)
+            self.summary.add_scalar('val/accuracy', Acc, self.val_iter_number)
             self.summary.add_scalar('val/precision', precision, self.val_iter_number)
             self.summary.add_scalar('val/recall', recall, self.val_iter_number)
             self.summary.add_scalar('val/loss: ', loss_eval, self.val_iter_number)
 
             print("val epoch:  {}/{}, ith:  {}/{}, loss：  {:.4f}, mIOU:  {:.2%}, accuracy  {:.2%}，precision  {:.2%}，recall  {:.2%}"
-                  .format(epoch_, self.config['epoch'], ith, len(self.val_data), loss_eval, mIOU, accuracy, precision, recall))
-        average_loss = epoch_loss / len(self.val_data)
-        average_IOU = IOU_epoch / len(self.val_data)
-        average_mIOU = mIOU_epoch/len(self.val_data)
-        average_Acc = Acc_epoch / len(self.val_data)
-        average_mAcc = mAcc_epoch / len(self.val_data)
-        average_precision = precision_epoch / len(self.val_data)
-        average_recall = recall_epoch / len(self.val_data)
+                  .format(epoch_, self.config['epoch'], ith, len(self.val_data), loss_eval, mIOU, Acc, precision, recall))
+        average_loss = np.nanmean(epoch_loss)
+        average_IOU = np.nanmean(IOU_epoch, axis=0)
+        average_mIOU = np.nanmean(mIOU_epoch)
+        average_Acc = np.nanmean(Acc_epoch)
+        average_precision = np.nanmean(precision_epoch)
+        average_recall = np.nanmean(recall_epoch)
 
         self.summary.add_scalar('val/loss_epoch', average_loss, epoch_)
         self.summary.add_scalar('val/mIOU_epoch', average_mIOU, epoch_)
-        self.summary.add_scalar('val/accuracy_epoch', average_mAcc, epoch_)
         self.summary.add_scalar('val/precision_epoch', average_precision, epoch_)
         self.summary.add_scalar('val/recall_epoch', average_recall, epoch_)
 
         print("epoch:  {}/{}, average_loss： {:.4f}，average_mIOU:  {:.2%}, average_accuracy：  {:.2%}, average_precision：  {:.2%}, average_recall：  {:.2%}"
-              .format(epoch_, self.config['epoch'], average_loss, average_mIOU, average_mAcc, average_precision, average_recall))
+              .format(epoch_, self.config['epoch'], average_loss, average_mIOU, average_Acc, average_precision, average_recall))
         print("class name  ", self.class_name)
         print("IOU/class:  ", average_IOU)
-        print("acc/class:  ", average_Acc)
         print('------------------------------------------------------------------')
         if average_mIOU > self.best_pred:
             self.best_pred = average_mIOU
