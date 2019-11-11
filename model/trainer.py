@@ -131,6 +131,7 @@ class Trainer(object):
         average_precision = np.nanmean(precision_epoch)
         average_recall = np.nanmean(recall_epoch)
 
+        self.summary.add_scalar('val/acc_epoch', average_Acc, epoch_)
         self.summary.add_scalar('val/loss_epoch', average_loss, epoch_)
         self.summary.add_scalar('val/mIOU_epoch', average_mIOU, epoch_)
         self.summary.add_scalar('val/precision_epoch', average_precision, epoch_)
