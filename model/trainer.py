@@ -68,6 +68,7 @@ class Trainer(object):
             point, labels = self.data_preprocess(data_dict, 'train')
             output_sparse = self.model(point)
             pred = output_sparse.F
+            self.reset_loss(labels)
             self.loss_value = self.loss(pred, labels) + self.loss_value
             epoch_loss.append(self.loss(pred, labels).item() / self.config["accumulate_gradient"])
             self.train_iter_number += 1
@@ -192,3 +193,14 @@ class Trainer(object):
         if self.config["use_cuda"]:
             points, labels = points.to(self.device), labels.to(self.device)
         return points, labels.long()
+
+    def reset_loss(self, label):
+        data_ = label.cpu().numpy()
+        number = data_.shape[0]
+        bin = np.bincount(data_, minlength=self.config["class"])
+        for ith, i in enumerate(bin):
+            if i != 0:
+                bin[ith] = number/i
+        bin = bin/np.sum(bin)
+        self.loss = torch.nn.CrossEntropyLoss(weight=torch.from_numpy(bin).cuda().float(), ignore_index=self.config['ignore_label'])
+
