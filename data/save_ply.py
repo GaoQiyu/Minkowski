@@ -2,7 +2,7 @@ import numpy as np
 import os
 from data.utils import save_point_cloud
 from data.utils import read_plyfile
-CATEGORY = ['wall', 'floor', 'beam', 'chair', 'sofa', 'table', 'door', 'window', 'bookcase', 'column', 'clutter', 'ceiling', 'board']
+CATEGORY = ['wall', 'floor', 'beam', 'chair', 'sofa', 'table', 'door', 'window', 'bookcase', 'column', 'ceiling', 'board']
 
 
 def S3DIS(data_path):
@@ -19,7 +19,9 @@ def S3DIS(data_path):
             for file in files:
                 if file != '.DS_Store' and file != 'Icon' and file != '':
                     name = file.split('_')[0]
-                    if name == 'stairs':  # remove stairs, following SegCloud
+                    if name == 'stairs' or name == 'clutter':
+                        # remove stairs, following SegCloud
+                        # remove clutter, following paper
                         continue
                     cat = CATEGORY.index(name)
                     tmp = open(os.path.join(folder_path, file), 'r').readlines()
@@ -34,4 +36,4 @@ def S3DIS(data_path):
 
 
 if __name__ == '__main__':
-    S3DIS("/media/gaoqiyu/File/data/shapenet_official_labeled")
+    S3DIS("/home/gaoqiyu/文档/Stanford3dDataset_v1.2_Aligned_Version")

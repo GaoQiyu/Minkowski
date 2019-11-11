@@ -10,7 +10,7 @@ class S3DISDataset(VoxelizationDataset):
     CLIP_BOUND = None
     LOCFEAT_IDX = 2
     ROTATION_AXIS = 'z'
-    NUM_LABELS = 13
+    NUM_LABELS = 12
     # Voxelization arguments
     CLIP_BOUND = None
     TEST_CLIP_BOUND = None

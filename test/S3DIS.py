@@ -68,7 +68,7 @@ if __name__ == '__main__':
     model.load_state_dict(model_dict)
     model.eval()
 
-    test_data = read_plyfile("/home/gaoqiyu/文档/Stanford3dDataset_v1.2_Aligned_Version/ply(复件)/val/Area_5_office_.ply")
+    test_data = read_plyfile("/home/gaoqiyu/文档/Stanford3dDataset_v1.2_Aligned_Version/ply(复件)/val/Area_5_office_5.ply")
     sinput, coords, feats, labels = data_preprocess(test_data, voxel_size)
 
     soutput = model(sinput.to(device))
