@@ -5,15 +5,13 @@
   "class": 12,
   "class_label": ["wall", "floor", "beam", "chair", "sofa", "table", "door",
                   "window", "bookcase", "column", "ceiling", "board"],
-  "loss_weight": [1, 1, 3, 3, 3, 3,
-                  3, 2, 3, 3, 1, 2],
 
   "lr": 0.1,
   "momentum": 0.9,
   "poly_power": 0.9,
   "weight_decay": 1e-4,
   "batch_size": 3,
-  "epoch": 300,
+  "epoch": 600,
   "ignore_label": 255,
   "train_voxel_size": 0.05,
   "val_voxel_size": 0.05,
@@ -27,7 +25,7 @@
   "data_aug_saturation_max": 0.5,
   "cache_data": false,
 
-  "data_path": "/home/gaoqiyu/文档/Stanford3dDataset_v1.2_Aligned_Version/ply",
+  "data_path": "/home/gaoqiyu/文档/Stanford3dDataset_v1.2_Aligned_Version/ply_0",
   "log_path": "/home/gaoqiyu/PycharmProjects/PointCloudSeg_Minkowski/log",
   "resume_path": "/home/gaoqiyu/PycharmProjects/PointCloudSeg_Minkowski/resume"
 }

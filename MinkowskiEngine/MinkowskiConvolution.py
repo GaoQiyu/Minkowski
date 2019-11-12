@@ -281,12 +281,16 @@ class MinkowskiConvolutionBase(MinkowskiModuleBase):
 
         # todo eval the field , default -stdv stdv
         self.kernel.data.uniform_(-stdv, stdv)
-        # self.kernel.data.normal_(-1, 1)
         # torch.nn.init.xavier_uniform_(self.kernel.data)
+        # torch.nn.init.xavier_normal_(self.kernel.data)
+        # torch.nn.init.kaiming_uniform_(self.kernel.data)
+        # torch.nn.init.kaiming_normal_(self.kernel.data)
         if self.bias is not None:
             self.bias.data.uniform_(-stdv, stdv)
-            # self.bias.data.normal_(-1, 1)
             # torch.nn.init.xavier_uniform_(self.bias.data)
+            # torch.nn.init.xavier_normal_(self.bias.data)
+            # torch.nn.init.kaiming_uniform_(self.bias.data)
+            # torch.nn.init.kaiming_normal_(self.bias.data)
 
     def __repr__(self):
         s = '(in={}, out={}, region_type={}, '.format(

@@ -167,6 +167,7 @@ class VoxelizationDatasetBase(DictDataset, ABC):
 
   def load_ply(self, index):
     filepath = self.data_root / self.data_paths[index]
+    # print(filepath)
     return read_plyfile(filepath), None
 
   def __len__(self):

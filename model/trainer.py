@@ -20,12 +20,11 @@ class Trainer(object):
         self.val_iter_number = 0
         self.epoch = 0
         self.class_name = self.config["class_label"]
-        loss_weight = torch.tensor(self.config["loss_weight"])
         if self.config["multi_gpu"]:
             self.device_list = list(range(torch.cuda.device_count()))
             self.device = self.device_list[0]
         else:
-            self.device = torch.device(0)
+            self.device = torch.device('cuda')
         self.loss_value = torch.tensor(0.0, requires_grad=True).to(self.device)
         self.point_number = self.config["point_num"]
         self.batch_size = self.config["batch_size"]
@@ -41,11 +40,10 @@ class Trainer(object):
                 lr=self.config["lr"] / 1e4, momentum=self.config["momentum"], weight_decay=1e-4)
         if self.config["use_cuda"]:
             self.model = self.model.to(self.device)
-            loss_weight = loss_weight.to(self.device)
         if self.config["multi_gpu"]:
             self.model = torch.nn.DataParallel(self.model, device_ids=self.device_list)
 
-        self.loss = torch.nn.CrossEntropyLoss(weight=loss_weight.float(), ignore_index=self.config['ignore_label'])
+        self.loss = torch.nn.CrossEntropyLoss(ignore_index=self.config['ignore_label'])
 
         self.train_data = initialize_data_loader(S3DISDataset, self.config, phase='TRAIN', threads=1, augment_data=True, shuffle=True, repeat=True, batch_size=1, limit_numpoints=False)
         self.val_data = initialize_data_loader(S3DISDataset, self.config, threads=1, phase='VAL', augment_data=False, shuffle=True, repeat=False, batch_size=1, limit_numpoints=False)
