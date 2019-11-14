@@ -68,7 +68,7 @@ if __name__ == '__main__':
     model.load_state_dict(model_dict)
     model.eval()
 
-    test_data = read_plyfile("/home/gaoqiyu/文档/Stanford3dDataset_v1.2_Aligned_Version/ply/val/Area_5_office_23.ply")
+    test_data = read_plyfile("/home/gaoqiyu/文档/Stanford3dDataset_v1.2_Aligned_Version/ply/val/Area_1_hallway_2.ply")
     sinput, coords, feats, labels = data_preprocess(test_data, voxel_size)
 
     soutput = model(sinput.to(device))
@@ -94,5 +94,5 @@ if __name__ == '__main__':
     ground_pcd.points = o3d.utility.Vector3dVector(coordinates * voxel_size + np.array([0, 10, 0]))
     ground_pcd.colors = o3d.utility.Vector3dVector(colors_ground / 255)
 
-    # o3d.visualization.draw_geometries([pred_pcd, ground_pcd])
-    o3d.visualization.draw_geometries([pred_pcd])
+    o3d.visualization.draw_geometries([pred_pcd, ground_pcd])
+    # o3d.visualization.draw_geometries([pred_pcd])

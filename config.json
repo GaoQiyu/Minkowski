@@ -13,8 +13,8 @@
   "batch_size": 3,
   "epoch": 600,
   "ignore_label": 255,
-  "train_voxel_size": 0.05,
-  "val_voxel_size": 0.05,
+  "train_voxel_size": 0.02,
+  "val_voxel_size": 0.02,
   "point_num": 80000,
   "accumulate_gradient": 1,
 

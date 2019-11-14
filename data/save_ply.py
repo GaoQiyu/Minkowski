@@ -28,7 +28,7 @@ def S3DIS(data_path):
                     tmp = np.append(tmp, np.array(cat).repeat(len(tmp)).reshape(-1, 1), axis=1)
                     point = np.append(point, tmp, axis=0)
             point = np.delete(point, 0, axis=0)
-            save_path = os.path.join(data_path, 'ply_{}'.format(fold), type_, scene[0] + '_' + scene[1]+'.ply')
+            save_path = os.path.join(data_path, 'ply', type_, scene[0] + '_' + scene[1]+'.ply')
             save_point_cloud(point, save_path, with_label=True)
 
 

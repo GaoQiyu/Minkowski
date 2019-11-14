@@ -13,17 +13,17 @@ class Evaluator(object):
 
     def precision(self):
         precision = np.diag(self.matrix) / self.matrix.sum(axis=1)
-        precision = np.nanmean(precision)
+        precision = np.nanmean(self.remove_zero(precision))
         return precision
 
     def recall(self):
         recall = np.diag(self.matrix) / self.matrix.sum(axis=0)
-        recall = np.nanmean(recall)
+        recall = np.nanmean(self.remove_zero(recall))
         return recall
 
     def mIOU(self):
         IoU = np.diag(self.matrix) / (np.sum(self.matrix, axis=1) + np.sum(self.matrix, axis=0) - np.diag(self.matrix) + 1e-20)
-        mIoU = np.nanmean(IoU)
+        mIoU = np.nanmean(self.remove_zero(IoU))
         return IoU, mIoU
 
     def generate(self, pred, label):
@@ -34,6 +34,13 @@ class Evaluator(object):
         precision = self.precision()
         recall = self.recall()
         return mIOU, Acc, precision, recall
+
+    def remove_zero(self, data):
+        tmp = []
+        for i in data:
+            if i != 0 and i != np.nan:
+                tmp.append(i)
+        return np.array(tmp)
 
 
 if __name__ == '__main__':
